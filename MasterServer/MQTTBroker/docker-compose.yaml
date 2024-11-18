@@ -5,10 +5,13 @@ services:
     image: eclipse-mosquitto
     container_name: mosquitto
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "1883:1883"   # Standard MQTT
+      - "8883:8883"   # Secure MQTT (MQTTS)
+      - "9001:9001"   # WebSocket (non-secure, optional if needed)
+      - "8083:8083"   # Secure WebSocket (WSS)
     volumes:
       - ./config:/mosquitto/config
       - ./data:/mosquitto/data
       - ./log:/mosquitto/log
+      - ./certificates:/mosquitto/certificates
     restart: unless-stopped
