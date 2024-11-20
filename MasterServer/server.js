@@ -9,7 +9,7 @@ const options = {
   ca: fs.readFileSync("./certificates/ca.crt"), // CA certificate path
   cert: fs.readFileSync("./certificates/client.crt"), // Client certificate path
   key: fs.readFileSync("./certificates/client.key"), // Client private key path
-  rejectUnauthorized: false, // Ensure only trusted certificates are allowed
+  rejectUnauthorized: true, // Ensure only trusted certificates are allowed
 };
 
 // Connect to the broker
