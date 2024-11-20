@@ -3,16 +3,52 @@
 #include <PubSubClient.h>
 
 // Replace with your Wi-Fi and MQTT broker details
-const char* wifi_ssid = "";        // Your Wi-Fi SSID
-const char* wifi_password = "";     // Your Wi-Fi password
-const char* mqtt_server = "192.168.228.205"; // MQTT broker's IP or hostname
+const char* wifi_ssid = "Tharun'sGalaxy M32";        // Your Wi-Fi SSID
+const char* wifi_password = "asdfghjkl";     // Your Wi-Fi password
+const char* mqtt_server = "Tharuns-MacBook-Air.local"; // MQTT broker's IP or hostname
 const int mqtt_port = 8883;                  // MQTTS port
-const char* sub_topic = "esp32/device_1/control";
-const char* pub_topic = "esp32/device_1/status";
+
+// Wi-Fi and MQTT objects
+WiFiClientSecure espClient; // Secure Wi-Fi client for MQTTS
+PubSubClient client(espClient);
 
 // MQTT credentials (if required)
 const char* mqtt_user = "";
 const char* mqtt_password = "";
+
+// Device ID and topics
+const char* device_id = "device_1";
+char config_topic[50];   // "esp32/<device_id>/config"
+char status_topic[50];   // "esp32/<device_id>/status"
+char control_topic[50];  // "esp32/<device_id>/control"
+
+
+// Function to generate topics
+void generateTopics() {
+  snprintf(config_topic, sizeof(config_topic), "esp32/%s/config", device_id);
+  snprintf(status_topic, sizeof(status_topic), "esp32/%s/status", device_id);
+  snprintf(control_topic, sizeof(control_topic), "esp32/%s/control", device_id);
+}
+
+// GPIO pin states
+const int gpio_pins[] = {4, 5, 16}; // Example pins to configure/control
+int pin_states[sizeof(gpio_pins) / sizeof(gpio_pins[0])] = {0}; // Pin states
+
+// Publish device status
+void publishStatus() {
+  char status_message[200];
+  snprintf(status_message, sizeof(status_message), "{ \"device_id\": \"%s\", \"pins\": {", device_id);
+  for (size_t i = 0; i < sizeof(gpio_pins) / sizeof(gpio_pins[0]); i++) {
+    char pin_status[50];
+    snprintf(pin_status, sizeof(pin_status), "\"%d\": \"%s\"%s", gpio_pins[i], 
+             pin_states[i] ? "HIGH" : "LOW", 
+             (i == sizeof(gpio_pins) / sizeof(gpio_pins[0]) - 1) ? " } }" : ", ");
+    strncat(status_message, pin_status, sizeof(status_message) - strlen(status_message) - 1);
+  }
+  client.publish(status_topic, status_message);
+  Serial.print("Published status: ");
+  Serial.println(status_message);
+}
 
 // Broker's certificate
 const char* ca_cert = R"EOF(
@@ -42,42 +78,54 @@ lNbV75YVpfsvRSgyBgjK
 // GPIO pin for control
 const int gpio_pin = 4;
 
-// Wi-Fi and MQTT objects
-WiFiClientSecure espClient; // Secure Wi-Fi client for MQTTS
-PubSubClient client(espClient);
 
+
+
+// Callback for MQTT messages
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.println(topic);
 
-  // Convert payload to a string
-  String message;
-  for (int i = 0; i < length; i++) {
-    message += (char)payload[i];
-  }
+  char message[length + 1];
+  memcpy(message, payload, length);
+  message[length] = '\0'; // Null-terminate the payload
 
   Serial.print("Message: ");
   Serial.println(message);
 
-  // Handle topics dynamically
-  String received_topic = String(topic);
-
-  // Check for specific topics
-  if (received_topic.endsWith("/control")) {
-    // Control topic logic
-    if (message == "ON") {
-      digitalWrite(gpio_pin, HIGH);
-      Serial.println("GPIO 4 ON");
-    } else if (message == "OFF") {
-      digitalWrite(gpio_pin, LOW);
-      Serial.println("GPIO 4 OFF");
-    } 
-  } else if (received_topic.endsWith("/status")) {
-    // Handle status requests or acknowledgments
-    Serial.println("Status topic message received: " + message);
-    // Add logic for status if needed
-  } else {
-    Serial.println("Unhandled topic: " + received_topic);
+  // Handle control messages
+  if (strcmp(topic, control_topic) == 0) {
+    int pin;
+    char state[10];
+    if (sscanf(message, "{ \"pin\": %d, \"state\": \"%s\" }", &pin, state) == 2) {
+      for (size_t i = 0; i < sizeof(gpio_pins) / sizeof(gpio_pins[0]); i++) {
+        if (gpio_pins[i] == pin) {
+          if (strcmp(state, "HIGH\"") == 0) {
+            digitalWrite(pin, HIGH);
+            pin_states[i] = 1;
+            Serial.printf("Pin %d set to HIGH\n", pin);
+          } else if (strcmp(state, "LOW\"") == 0) {
+            digitalWrite(pin, LOW);
+            pin_states[i] = 0;
+            Serial.printf("Pin %d set to LOW\n", pin);
+          }
+          publishStatus(); // Report status after change
+        }
+      }
+    }else if(strcmp(message, "GET_STATUS") == 0){
+      publishStatus();
+    }
+  }
+  // Handle configuration messages
+  else if (strcmp(topic, config_topic) == 0) {
+    char new_device_id[20];
+    if (sscanf(message, "{ \"device_id\": \"%[^\"]\" }", new_device_id) == 1) {
+      Serial.printf("Device ID updated from %s to %s\n", device_id, new_device_id);
+      device_id = strdup(new_device_id); // Update the device ID
+      generateTopics(); // Regenerate topics
+      client.subscribe(config_topic);
+      client.subscribe(control_topic);
+    }
   }
 }
 
@@ -85,16 +133,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTTS connection...");
-    if (client.connect("ESP32Client")) {
+    if (client.connect(device_id, mqtt_user, mqtt_password)) {
       Serial.println("Connected to MQTTS broker!");
-      client.subscribe(sub_topic); // Subscribe to a topic
+
+      // Subscribe to topics
+      client.subscribe(config_topic);
+      client.subscribe(control_topic);
+
       Serial.print("Subscribed to: ");
-      Serial.println(sub_topic);
+      Serial.println(config_topic);
+      Serial.println(control_topic);
 
-      client.publish(pub_topic, "ESP32 connected");
-      Serial.print("Published to: ");
-      Serial.println(pub_topic);
-
+      // Publish initial status
+      publishStatus();
     } else {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
@@ -106,16 +157,22 @@ void reconnect() {
 
 // Configure MQTTS
 void setupMQTT() {
-  // espClient.setCACert(ca_cert); // Load CA certificate
-  espClient.setInsecure();
+   // Generate MQTT topics
+  generateTopics();
+  espClient.setCACert(ca_cert); // Load CA certificate
+  // espClient.setInsecure();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 }
 
 void setup() {
   Serial.begin(115200);
-  pinMode(gpio_pin, OUTPUT);
-  digitalWrite(gpio_pin, LOW);
+
+  // Config PINS to OUTPUT
+  for (size_t i = 0; i < sizeof(gpio_pins) / sizeof(gpio_pins[0]); i++) {
+    pinMode(gpio_pins[i], OUTPUT);
+    digitalWrite(gpio_pins[i], LOW);
+  }
 
   // Connect to Wi-Fi
   Serial.print("Connecting to Wi-Fi...");
