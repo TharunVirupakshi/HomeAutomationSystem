@@ -3,6 +3,7 @@
 #include <PubSubClient.h>
 
 // Replace with your Wi-Fi and MQTT broker details
+
 const char* wifi_ssid = "Tharun'sGalaxy M32";        // Your Wi-Fi SSID
 const char* wifi_password = "asdfghjkl";     // Your Wi-Fi password
 const char* mqtt_server = "Tharuns-MacBook-Air.local"; // MQTT broker's IP or hostname
@@ -12,9 +13,11 @@ const int mqtt_port = 8883;                  // MQTTS port
 WiFiClientSecure espClient; // Secure Wi-Fi client for MQTTS
 PubSubClient client(espClient);
 
+
 // MQTT credentials (if required)
 const char* mqtt_user = "";
 const char* mqtt_password = "";
+
 
 // Device ID and topics
 const char* device_id = "device_1";
@@ -50,6 +53,7 @@ void publishStatus() {
   Serial.println(status_message);
 }
 
+
 // Broker's certificate
 const char* ca_cert = R"EOF(
 -----BEGIN CERTIFICATE-----
@@ -78,20 +82,21 @@ lNbV75YVpfsvRSgyBgjK
 // GPIO pin for control
 const int gpio_pin = 4;
 
-
-
-
 // Callback for MQTT messages
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.println(topic);
+
 
   char message[length + 1];
   memcpy(message, payload, length);
   message[length] = '\0'; // Null-terminate the payload
 
+
   Serial.print("Message: ");
   Serial.println(message);
+
 
   // Handle control messages
   if (strcmp(topic, control_topic) == 0) {
@@ -126,6 +131,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
       client.subscribe(config_topic);
       client.subscribe(control_topic);
     }
+
   }
 }
 
@@ -133,6 +139,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTTS connection...");
+
     if (client.connect(device_id, mqtt_user, mqtt_password)) {
       Serial.println("Connected to MQTTS broker!");
 
@@ -146,6 +153,7 @@ void reconnect() {
 
       // Publish initial status
       publishStatus();
+
     } else {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
@@ -157,10 +165,12 @@ void reconnect() {
 
 // Configure MQTTS
 void setupMQTT() {
+
    // Generate MQTT topics
   generateTopics();
   espClient.setCACert(ca_cert); // Load CA certificate
   // espClient.setInsecure();
+
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 }
@@ -168,11 +178,13 @@ void setupMQTT() {
 void setup() {
   Serial.begin(115200);
 
+
   // Config PINS to OUTPUT
   for (size_t i = 0; i < sizeof(gpio_pins) / sizeof(gpio_pins[0]); i++) {
     pinMode(gpio_pins[i], OUTPUT);
     digitalWrite(gpio_pins[i], LOW);
   }
+
 
   // Connect to Wi-Fi
   Serial.print("Connecting to Wi-Fi...");
