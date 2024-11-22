@@ -69,7 +69,6 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
 ```
 *Topic: device_1/pin/4/status*
 ```json
-// 
 {
   "state": "HIGH"
 }
@@ -78,7 +77,7 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
 *Topic: device_1/pin/4/set/ack*
 ```json
 {
-  "error": "Invalid state HIg", // Accepts only HIGH or LOW
+  "error": "Invalid state HIg", 
   "pin": 4
 }
 ```
@@ -86,9 +85,8 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
 *Topic: device_1/pin/4/set/ack*
 ```json
 {
-  "error": "Invalid pin", // Wrong pin
+  "error": "Invalid pin",
   "pin": 20
 }
+```
 
-
-```    
