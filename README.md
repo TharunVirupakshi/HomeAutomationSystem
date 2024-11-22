@@ -58,29 +58,33 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
 -  Send `HIGH` or `LOW` to `<device_id>/pin/<pin_no>/set` to set the state of the pin. The acknowledgement of the same pin is received at `<device_id>/pin/<pin_no>/set/ack`.
 (The status of the pin is published back to `<device_id>/pin/<pin_no>/status`)
 ###### Example response:
-```json
-// SUCCESS
+- ###### Success
+*Topic: device_1/pin/4/set/ack* 
 
-// Topic: device_1/pin/4/set/ack
+```json
 {
   "success": true,
   "pin": 4
 }
-
-// Topic: device_1/pin/4/status
+```
+*Topic: device_1/pin/4/status*
+```json
+// 
 {
   "state": "HIGH"
 }
-
-//------------------------------
-
-// FAILURE
-// Topic: device_1/pin/4/set/ack
+```
+- ###### Failure
+*Topic: device_1/pin/4/set/ack*
+```json
 {
   "error": "Invalid state HIg", // Accepts only HIGH or LOW
   "pin": 4
 }
-// Topic: device_1/pin/4/set/ack
+```
+
+*Topic: device_1/pin/4/set/ack*
+```json
 {
   "error": "Invalid pin", // Wrong pin
   "pin": 20
