@@ -34,8 +34,8 @@ export default function PressableBtn({customStyles} : PressableBtnProps){
           style={[{
             opacity: animated,
             backgroundColor: "white",
-            padding: 5,
-            width: 50
+            padding: 7,
+            width: 100
           }, customStyles.button]}
         >
         <Text style={customStyles.text}>Click</Text>
