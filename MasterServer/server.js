@@ -1,5 +1,12 @@
 const mqtt = require("mqtt");
 const fs = require("fs");
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
 // Array to store device IDs
 const devices = [];
@@ -46,13 +53,18 @@ const discover = () => {
     }
   });
 
-  client.publish("device-discovery/get", "Discovery request", { qos: 1 }, (err) => {
-    if (err) {
-      console.error("Publish error:", err.message);
-    } else {
-      console.log("Discovery request sent.");
+  client.publish(
+    "device-discovery/get",
+    "Discovery request",
+    { qos: 1 },
+    (err) => {
+      if (err) {
+        console.error("Publish error:", err.message);
+      } else {
+        console.log("Discovery request sent.");
+      }
     }
-  });
+  );
 };
 
 // Function to check the status of a device's pin(s)
@@ -77,45 +89,48 @@ const statuscheck = (id, pin_no) => {
       if (err) console.error("Subscription error:", err.message);
       else console.log(`Subscribed to topic: ${topic}`);
     });
-    client.publish(`${id}/pin/${pin_no}/get`, "pin status", { qos: 1 }, (err) => {
-      if (err) console.error("Publish error:", err.message);
-    });
+    client.publish(
+      `${id}/pin/${pin_no}/get`,
+      "pin status",
+      { qos: 1 },
+      (err) => {
+        if (err) console.error("Publish error:", err.message);
+      }
+    );
   }
 };
 
-const control=(id,pin_no,signal)=>{
+const control = (id, pin_no, signal) => {
   client.subscribe(`${id}/pin/${pin_no}/ack`, { qos: 1 }, (err) => {
     if (err) console.error("Subscription error:", err.message);
     else console.log(`Subscribed to topic ack`);
   });
-  client.publish(`${id}/pin/${pin_no}/set`,signal,{qos:1},(err)=>{
-    if(err){
-      console.log('error:',err.message);
-    }
-    else{
-      console.log("set pin to: ",signal);
+  client.publish(`${id}/pin/${pin_no}/set`, signal, { qos: 1 }, (err) => {
+    if (err) {
+      console.log("error:", err.message);
+    } else {
+      console.log("set pin to: ", signal);
     }
   });
 };
 
-const getInfo=(id)=>{
+const getInfo = (id) => {
   client.subscribe(`${id}/info`, { qos: 1 }, (err) => {
     if (err) console.error("Subscription error:", err.message);
     else console.log(`Subscribed to to info`);
   });
-  client.publish(`${id}/info/get`,"get info",{qos:1},(err)=>{
-    if(err){
-      console.log('error:',err.message);
-    }
-    else{
+  client.publish(`${id}/info/get`, "get info", { qos: 1 }, (err) => {
+    if (err) {
+      console.log("error:", err.message);
+    } else {
       console.log("sent info req");
     }
   });
-}
-
+};
+var messageString;
 // Handle all incoming messages
 client.on("message", (topic, message) => {
-  const messageString = message.toString();
+  messageString = message.toString();
 
   if (topic === "device-discovery") {
     console.log(`Discovery message received: ${messageString}`);
@@ -127,24 +142,66 @@ client.on("message", (topic, message) => {
       }
     });
     console.log("Updated devices list:", devices);
+    io.to("device-discovery").emit("DEVICE_DISCOVERY", devices);
   } else if (topic.endsWith("/pins/status")) {
-    console.log(`Pin status received: ${messageString}`);
+    console.log("Received", JSON.parse(message));
+    const msg = JSON.parse(message);
+    const room = `status-check-${msg.id}`;
+    io.to(room).emit("PIN_STATUS", msg);
   } else if (topic.includes("/pin/") && topic.endsWith("/status")) {
     console.log(`Specific pin status received: ${messageString}`);
-  }else if(topic.endsWith("/ack")){
+    console.log("Received", JSON.parse(message));
+    const msg = JSON.parse(message);
+    const room = `status-check-${msg.id}`;
+    io.to(room).emit("PIN_STATUS", msg);
+  } else if (topic.endsWith("/ack")) {
     console.log(`recieved ack: ${messageString}`);
-  }else if(topic.endsWith("/info")){
-    console.log(`recieved info: ${messageString}`);
+    const msg = JSON.parse(message);
+    const room = `control-device-${msg.id}`;
+    io.to(room).emit("DEVICE-ACK", msg);
+  } else if (topic.endsWith("/info")) {
+    console.log(`recieved info: ${JSON.parse(messageString)}`);
+    console.log("Received", JSON.parse(message));
+    const msg = JSON.parse(message);
+    const room = `get-info-${msg.id}`;
+    io.to(room).emit("DEVICE-INFO", msg);
   }
 });
 
+io.on("connection", (socket) => {
+  console.log(`Client connected: ${socket.id}`);
 
+  socket.on("discover-devices", () => {
+    socket.join("device-discovery");
+    discover();
+  });
 
+  socket.on("status-checker", ({ id, pin_no }) => {
+    const room = `status-check-${id}`;
+    console.log(id, pin_no);
+    socket.join(room);
+    statuscheck(id, pin_no);
+  });
 
-// Call functions
-discover();
-statuscheck(1, "all");
-statuscheck(1, 4);
-control(1,4,"on");
-getInfo(1);
+  socket.on("get-info", ({ id }) => {
+    const room = `get-info-${id}`;
+    console.log(id);
+    socket.join(room);
+    getInfo(id);
+  });
 
+  socket.on("control-device",({id,pin_no,signal})=>{
+    const room=`control-device-${id}`;
+    socket.join(room);
+    control(id,pin_no,signal);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
+});
+
+//Web socket logic
+server.listen(3000, () => {
+  console.log("Listening on *:3000");
+});
