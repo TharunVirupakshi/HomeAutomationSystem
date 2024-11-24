@@ -4,7 +4,12 @@
     "slug": "kisel-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon-black.png",
+    "splash": {
+      "image": "./assets/images/splashscreen.png",
+      "backgroundColor": "#000000",
+      "resizeMode": "cover"
+    },
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -27,10 +32,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "image": "./assets/images/splashscreen.png",
+          "dark": {
+            "image": "./assets/images/splashscreen.png",
+            "backgroundColor": "#000000"
+          },
+          "resizeMode": "cover",
+          "backgroundColor": "#000000"
         }
       ]
     ],
