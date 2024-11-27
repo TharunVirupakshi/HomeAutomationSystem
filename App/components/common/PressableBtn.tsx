@@ -9,8 +9,9 @@ type CustomStyles = {
 
 interface PressableBtnProps {
 customStyles: CustomStyles;
+btnText: string 
 }
-export default function PressableBtn({customStyles} : PressableBtnProps){
+export default function PressableBtn({customStyles, btnText} : PressableBtnProps){
     const animated = new Animated.Value(1);
 
     const fadeIn = () => {
@@ -35,10 +36,11 @@ export default function PressableBtn({customStyles} : PressableBtnProps){
             opacity: animated,
             backgroundColor: "white",
             padding: 7,
-            width: 100
+            width: 100,
+            borderRadius: 100
           }, customStyles.button]}
         >
-        <Text style={customStyles.text}>Click</Text>
+        <Text style={[{textAlign: 'center'} ,customStyles.text]}>{btnText}</Text>
         </Animated.View>
         </Pressable>
         

@@ -1,53 +1,125 @@
 
 import React from "react";
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Pressable, Text, View, StyleSheet, Animated } from "react-native";
+import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOpacity} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
 import {COLORS, FONTS} from '../constants';
-import { PressableBtn } from "@/components";
+import { PressableBtn, PressableWithOpacity } from "@/components";
+import { Stack } from "expo-router";
+import AntDesign from '@expo/vector-icons/AntDesign';
+import Entypo from '@expo/vector-icons/Entypo';
 
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+
+
+const header = () => {
+  return (
+    <View style={styles.customHeader}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          // borderStyle: "solid",
+          // borderWidth: 0.5,
+          // borderColor: "white",
+          
+        }}
+      >
+        <Image
+          source={require("../assets/images/app-adaptive-icon-white.png")} // Replace with your logo path
+          style={styles.logo}
+        />
+        <View style={{
+          height: '100%',
+          width: 0.5,
+          backgroundColor: "grey",
+          marginHorizontal: 15
+        }}/>
+        <PressableWithOpacity>
+          <View style={{flexDirection: "row", alignItems: "center"}}>
+            <Text style={{
+              includeFontPadding: false,
+              fontSize: FONTS.size.large,
+              fontFamily: FONTS.medium,
+              color: COLORS.text,
+              marginRight: 5
+            }}>My Home</Text>
+          <Entypo name="chevron-small-down" size={15} color="white" />
+        </View>
+      </PressableWithOpacity>
+      </View>
+    </View>
+  );
+};
 
 
 export default function Index() {
 
-  const animated = new Animated.Value(1);
 
-  const fadeIn = () => {
-    Animated.timing(animated, {
-      toValue: 0.4,
-      duration: 100,
-      useNativeDriver: true,
-    }).start();
-  };
-  const fadeOut = () => {
-    Animated.timing(animated, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  setTimeout(()=> SplashScreen.hide(), 3000);
 
   return (
-    <View
+    <SafeAreaView
       style={{
         flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: COLORS.background
+        backgroundColor: COLORS.background,
+        paddingHorizontal: 15,
+        paddingTop: 10
       }}
     >
-      <Text style={{color: COLORS.text, fontSize: FONTS.size.medium}}>Edit app/index.tsx to edit this screen.</Text>
-      <PressableBtn customStyles={{}}/>
-    </View>
+   
+      <Stack.Screen 
+        options={{
+          headerShown: true,
+          headerTitle: header,
+          headerShadowVisible: false
+        }}
+      />
+     
+        <View style={{backgroundColor: COLORS.card, borderRadius: 10, padding: 15}}>
+          <Text style={{color: COLORS.text, fontSize: FONTS.size.extraLarge, fontFamily: FONTS.medium}}>Hi, Paul</Text>
+          <Text style={{color: COLORS.textLight, fontSize: FONTS.size.small, fontFamily: FONTS.regular}}>Let's get started</Text>
+          <PressableBtn customStyles={{
+            button:{
+              marginTop: 5,
+              
+            },
+            text: {
+              fontFamily: FONTS.medium,
+              includeFontPadding: false
+            }
+          }} btnText={"Get started"}/>
+        </View>
+     
+    </SafeAreaView>
   );
 }
 
 
 const styles = StyleSheet.create({
+  customHeader: {
+    flexDirection: "row",
+    backgroundColor: COLORS.background,
+    // backgroundColor: "grey",
+    width: "100%",
+    paddingVertical: 15
+  },
+  headerText: {
+    fontSize: FONTS.size.large,
+    fontFamily: FONTS.bold,
+    color: COLORS.text,
+    // textAlign: "center",
+  },
+  headerBottomBorder: {
+    width: "100%",
+    height: 2,
+    backgroundColor: "white",
+    // marginTop: 10,
+  },
+  logo: {
+    width: 30,
+    height: 30,
+    objectFit: "contain"
+  },
   button: {
     alignItems: 'center',
     justifyContent: 'center',
