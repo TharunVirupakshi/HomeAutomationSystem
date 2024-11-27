@@ -3,7 +3,7 @@ export const COLORS = {
     secondary: "#C2185B",
     background: "#000000", // Pure black for AMOLED
     text: "#FFFFFF",
-    textLight: "lightgrey",
+    textLight: "#b4b4b6",
     card: "#252527",
   };
   

@@ -4,56 +4,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOpacity} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
-import {COLORS, FONTS} from '../constants';
+import {COLORS, FONTS} from '../../constants';
 import { PressableBtn, PressableWithOpacity } from "@/components";
 import { Stack } from "expo-router";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 
 
-const header = () => {
-  return (
-    <View style={styles.customHeader}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          // borderStyle: "solid",
-          // borderWidth: 0.5,
-          // borderColor: "white",
-          
-        }}
-      >
-        <Image
-          source={require("../assets/images/app-adaptive-icon-white.png")} // Replace with your logo path
-          style={styles.logo}
-        />
-        <View style={{
-          height: '100%',
-          width: 0.5,
-          backgroundColor: "grey",
-          marginHorizontal: 15
-        }}/>
-        <PressableWithOpacity>
-          <View style={{flexDirection: "row", alignItems: "center"}}>
-            <Text style={{
-              includeFontPadding: false,
-              fontSize: FONTS.size.large,
-              fontFamily: FONTS.medium,
-              color: COLORS.text,
-              marginRight: 5
-            }}>My Home</Text>
-          <Entypo name="chevron-small-down" size={15} color="white" />
-        </View>
-      </PressableWithOpacity>
-      </View>
-    </View>
-  );
-};
 
 
-export default function Index() {
+
+export default function Settings() {
 
 
 
@@ -70,12 +34,17 @@ export default function Index() {
       <Stack.Screen 
         options={{
           headerShown: true,
-          headerTitle: header,
-          headerShadowVisible: false
+          title: "Settings",
+          headerTitleStyle: {
+            color: COLORS.text
+          },
+          headerStyle:{
+            backgroundColor: COLORS.background
+         }
         }}
       />
      
-        <View style={{backgroundColor: COLORS.card, borderRadius: 10, padding: 15}}>
+        {/* <View style={{backgroundColor: COLORS.card, borderRadius: 10, padding: 15}}>
           <Text style={{color: COLORS.text, fontSize: FONTS.size.extraLarge, fontFamily: FONTS.medium}}>Hi, Paul</Text>
           <Text style={{color: COLORS.textLight, fontSize: FONTS.size.small, fontFamily: FONTS.regular}}>Let's get started</Text>
           <PressableBtn customStyles={{
@@ -88,7 +57,7 @@ export default function Index() {
               includeFontPadding: false
             }
           }} btnText={"Get started"}/>
-        </View>
+        </View> */}
      
     </SafeAreaView>
   );

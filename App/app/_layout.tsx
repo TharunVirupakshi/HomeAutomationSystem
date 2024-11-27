@@ -19,7 +19,7 @@ export default function RootLayout() {
       }else{
         setIsReady(false);
       }
-      setTimeout(()=> SplashScreen.hide(), 1000);
+      setTimeout(()=> SplashScreen.hide(), 2000);
     }
 
     checkFonts();
@@ -39,5 +39,11 @@ export default function RootLayout() {
         color: COLORS.text
       },
       headerTintColor: COLORS.primary
-    }}/>;
+    }}>
+      <Stack.Screen name='(tabs)' options={{
+        headerStyle: {
+          backgroundColor: COLORS.background
+        },
+      }}/>
+      </Stack>;
 }
