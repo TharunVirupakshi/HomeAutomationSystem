@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import React, {useState, useEffect, useCallback} from "react";
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from '../hooks/useFonts'; 
+import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -26,9 +27,16 @@ export default function RootLayout() {
   }, [fontsLoaded])
   
 
- 
+  const navTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: 'transparent',
+    },
+  };
 
   return <Stack
+    
     screenOptions={{
       headerShown: false,
       headerStyle: {
@@ -38,12 +46,14 @@ export default function RootLayout() {
         fontWeight: 'bold',
         color: COLORS.text
       },
-      headerTintColor: COLORS.primary
+      headerTintColor: COLORS.primary,
+      presentation: 'transparentModal'
     }}>
+      
       <Stack.Screen name='(tabs)' options={{
         headerStyle: {
           backgroundColor: COLORS.background
-        },
+        }
       }}/>
       </Stack>;
 }

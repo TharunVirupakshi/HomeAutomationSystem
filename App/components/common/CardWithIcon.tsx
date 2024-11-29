@@ -27,8 +27,9 @@ const CardWithIcon: React.FC<CardWithIconProps> = ({
 }) => {
   return (
     <View style={[styles.card, customStyles.cardStyle]}>
-      <View style={{flex: 1, flexWrap: "wrap"}}>
-        <Text style={[styles.title, customStyles.titleStyle]}>{title}</Text>
+      <View style={styles.textContainer}
+        >
+        <Text style={[styles.title, customStyles.titleStyle]} numberOfLines={1} ellipsizeMode='middle'>{title}</Text>
         <Text style={[styles.subtitle, customStyles.subtitleStyle]}>{subtitle}</Text>
 
         {btnText && 
@@ -47,7 +48,9 @@ const CardWithIcon: React.FC<CardWithIconProps> = ({
         
       </View>
       <View style={styles.iconContainer}>
-        {icon}
+        <View style={styles.iconInnerContainer}>
+            {icon}
+        </View>
       </View>
     </View>
   );
@@ -56,6 +59,14 @@ const CardWithIcon: React.FC<CardWithIconProps> = ({
 export default CardWithIcon;
 
 const styles = StyleSheet.create({
+  textContainer: {
+    flex: 1, 
+    flexWrap: "wrap",
+    flexShrink: 1,
+    // marginRight: 5,
+    // borderColor: "white",
+    // borderWidth: 0.5
+    },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 10,
@@ -68,7 +79,8 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.size.extraLarge,
     fontFamily: FONTS.medium,
-    flexWrap: "wrap"
+    flexShrink: 2,
+    width: "100%"
   },
   subtitle: {
     color: COLORS.textLight,
@@ -76,8 +88,21 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
   },
   iconContainer: {
+    // flex: 0.5,
+    width: 50, 
+    aspectRatio: 1,
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     // borderColor: "white",
     // borderWidth: 0.5,
-    padding: 15,
+    padding: 3,
+    marginLeft: 2
   },
+  iconInnerContainer:{
+    padding: 1,
+    // borderColor: "white",
+    // borderWidth: 0.5
+  }
 });

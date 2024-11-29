@@ -18,6 +18,7 @@ export default function TabLayout() {
         tabBarActiveBackgroundColor: "white",
         tabBarInactiveBackgroundColor: COLORS.textLight,
         headerShown: false,
+        
         tabBarBackground: () => (
             <View
               style={{
@@ -38,6 +39,7 @@ export default function TabLayout() {
             // position: 'absolute'
           },
         }),
+        
       }}>
       <Tabs.Screen
         name="index"
