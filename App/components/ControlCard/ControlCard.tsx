@@ -56,7 +56,7 @@ const CardWithIcon: React.FC<ControlCardProps> = ({
           flexDirection: "row",
         //   borderColor: "white",
         //   borderWidth: 0.5,
-          justifyContent: "space-between",
+          justifyContent: "space-between"
         }}
       >
         <View
