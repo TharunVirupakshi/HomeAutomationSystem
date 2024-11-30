@@ -3,6 +3,7 @@ const fs = require("fs");
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const socketEvents = require("./socketEvents");
 
 const app = express();
 const server = http.createServer(app);
@@ -52,22 +53,22 @@ const subscribe = (topic) => {
 
 //publish function
 const publish = (topic, message) => {
-  client.publish(topic, message, { qos: 1 }, (err) => {
+  client.publish(topic, message, { qos: 0 }, (err) => {
     if (err) console.error(`Publish error for topic ${topic}:`, err.message);
-    else console.log(`Message published to ${topic}`);
+    else console.log(`[ACTION] Message published to ${topic}`);
   });
 };
 
 
 
-
+subscribe("device-discovery");
 
 
 
 // Function for device discovery
 const discover = () => {
-  const topics = ["device-discovery", "device-discovery/get"];
-  subscribe(topics);
+  // const topics = ["device-discovery", "device-discovery/get"];
+  // subscribe(topics);
   publish("device-discovery/get","discovery request");
 };
 
@@ -100,17 +101,51 @@ const getInfo = (id) => {
 
 // Define handlers for specific topics
 const handleDeviceDiscovery = (message) => {
-  console.log(`Discovery message received: ${message}`);
-  const lines = message.split("\n");
-  lines.forEach((line) => {
-    const trimmedLine = line.trim();
-    if (trimmedLine && !devices.includes(trimmedLine)) {
-      devices.push(trimmedLine);
+  console.log(`[INFO] Discovery message received: ${message}`);
+
+  try {
+    // Parse the JSON message
+    const parsedMessage = JSON.parse(message);
+
+    // Validate required fields
+    if (!parsedMessage.device_id || !parsedMessage.status) {
+      console.warn(`[WARN] Invalid discovery message: ${message}`);
+      return;
     }
-  });
-  console.log("Updated devices list:", devices);
-  io.to("device-discovery").emit("DEVICE_DISCOVERY", devices);
+
+    // Check if the device is already in the list
+    const deviceExists = devices.some(
+      (device) => device.device_id === parsedMessage.device_id
+    );
+
+    if (!deviceExists) {
+      // Add new device to the list
+      devices.push({
+        device_id: parsedMessage.device_id,
+        status: parsedMessage.status,
+      });
+    } else {
+      // Update the status of an existing device
+      devices.forEach((device) => {
+        if (device.device_id === parsedMessage.device_id) {
+          device.status = parsedMessage.status;
+        }
+      });
+    }
+
+    console.log(`[INFO] Updated devices list: ${JSON.stringify(devices)}`);
+
+    // Send updated devices list to the WebSocket clients
+    io.to("device-discovery").emit(socketEvents.DEVICE_LIST, {
+      success: true,
+      message: "Device discovery completed",
+      devices: devices,
+    });
+  } catch (error) {
+    console.error(`[ERROR] Failed to process discovery message: ${error.message}`);
+  }
 };
+
 
 const handlePinStatus = (message, topic) => {
   console.log("Received:", JSON.parse(message));
@@ -171,7 +206,10 @@ client.on("message", (topic, message) => {
 io.on("connection", (socket) => {
   console.log(`Client connected: ${socket.id}`);
 
-  socket.on("discover-devices", () => {
+  socket.on(socketEvents.DISCOVER_DEVICES, () => {
+    console.log(`[INFO] DISCOVER_DEVICES event received from client: ${socket.id}`);
+    console.log(`[ACTION] Joining room: device-discovery`);
+
     socket.join("device-discovery");
     discover();
   });
