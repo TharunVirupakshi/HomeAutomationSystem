@@ -90,3 +90,115 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
 }
 ```
 
+
+## **WebSocket Events**
+### **Client-to-Server Events**
+1. **`DISCOVER_DEVICES`**
+   - **Description**: Requests the server to discover IoT devices.
+   - **Payload**: None
+   - **Server Action**:
+     - Joins the client to the `device-discovery` room.
+     - Triggers the MQTT discovery process.
+
+2. **`GET_PIN_STATUS`**
+   - **Description**: Requests the status of specific pins or all pins on a device.
+   - **Payload**:
+     ```json
+     {
+       "id": "device_id",
+       "pin_no": "pin_number | 'all'"
+     }
+     ```
+   - **Server Action**:
+     - Joins the client to a room specific to the device and pin.
+     - Publishes an MQTT request to fetch the pin status.
+
+3. **`GET_DEVICE_INFO`**
+   - **Description**: Requests detailed information about a device.
+   - **Payload**:
+     ```json
+     {
+       "id": "device_id"
+     }
+     ```
+   - **Server Action**:
+     - Joins the client to a `device-info` room.
+     - Publishes an MQTT request for device information.
+
+4. **`CONTROL_DEVICE`**
+   - **Description**: Sends a control signal to a device pin.
+   - **Payload**:
+     ```json
+     {
+       "id": "device_id",
+       "pin_no": "pin_number",
+       "state": "HIGH | LOW"
+     }
+     ```
+   - **Server Action**:
+     - Joins the client to a `device-ack` room.
+     - Publishes an MQTT message to set the pin state.
+
+---
+
+### **Server-to-Client Events**
+1. **`DEVICE_LIST`**
+   - **Triggered By**: Device discovery process.
+   - **Payload**:
+     ```json
+     {
+       "success": true,
+       "message": "Device discovery completed",
+       "devices": [
+         {
+           "device_id": "id",
+           "status": "online | offline"
+         }
+       ]
+     }
+     ```
+
+2. **`PIN_STATUS`**
+   - **Triggered By**: Response to a pin status check.
+   - **Payload**:
+      <br>For all pins
+     ```json
+     {
+       "device_id": "id",
+       "pins": {
+         "pin_number": "state"
+       }
+     }
+     ```
+     For single pin
+     ```json
+     {
+        "device_id": "id",
+        "pin_no": "pin_no",
+        "state": "LOW | HIGH"
+     }
+     ```
+     
+
+3. **`DEVICE_INFO`**
+   - **Triggered By**: Response to a device info request.
+   - **Payload**:
+     ```json
+     {
+       "device_id": "id",
+       "status": "ONLINE | OFFLINE"
+     }
+     ```
+
+4. **`DEVICE_ACK`**
+   - **Triggered By**: Acknowledgment of a pin control action.
+   - **Payload**:
+     ```json
+     {
+      "device_id": "id",
+      "success": true | false,
+      "pin": 18
+     }
+     ```
+
+---

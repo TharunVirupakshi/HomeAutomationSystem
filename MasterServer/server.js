@@ -4,6 +4,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const socketEvents = require("./socketEvents");
+const { parse } = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -74,7 +75,7 @@ const discover = () => {
 
 // Function to check the status of a device's pin(s)
 const statuscheck = (id, pin_no) => {
-  if (!id || !Number.isInteger(parseInt(id))) {
+  if (!id) {
     console.error("Invalid device ID provided.");
     return;
   }
@@ -88,22 +89,26 @@ const statuscheck = (id, pin_no) => {
   }
 };
 
-const control = (id, pin_no, signal) => {
-  subscribe(`${id}/pin/${pin_no}/ack`);
-  publish(`${id}/pin/${pin_no}/set`, signal);
+const control = (id, pin_no, state) => {
+  if (!id) {
+    console.error("Invalid device ID provided.");
+    return;
+  }
+  subscribe(`${id}/pin/${pin_no}/set/ack`);
+  publish(`${id}/pin/${pin_no}/set`, state);
 };
 
 const getInfo = (id) => {
- subscribe(`${id}/info`);
+  subscribe(`${id}/info`);
   publish(`${id}/info/get`, "get info");
 };
 
 
 // Define handlers for specific topics
 const handleDeviceDiscovery = (message) => {
-  console.log(`[INFO] Discovery message received: ${message}`);
-
+  
   try {
+    console.log(`[INFO] Discovery message received: ${message}`);
     // Parse the JSON message
     const parsedMessage = JSON.parse(message);
 
@@ -148,31 +153,99 @@ const handleDeviceDiscovery = (message) => {
 
 
 const handlePinStatus = (message, topic) => {
-  console.log("Received:", JSON.parse(message));
-  const msg = JSON.parse(message);
-  const room = `status-check-${msg.id}`;
-  io.to(room).emit("PIN_STATUS", msg);
+
+  try {
+    console.log("[INFO] Received:", JSON.parse(message));
+    const parsedMessage = JSON.parse(message);
+
+    const topicParts = topic.split("/");
+    const device_id = topicParts[0];
+
+    const room = `pin-status-check-${device_id}`;
+    io.to(room).emit(socketEvents.PIN_STATUS, {
+      device_id,
+      pins: parsedMessage
+    });
+  } catch (error) {
+    console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
+  } 
+  
 };
 
-const handleSpecificPinStatus = (message, topic) => {
-  console.log(`Specific pin status received: ${message}`);
-  const msg = JSON.parse(message);
-  const room = `status-check-${msg.id}`;
-  io.to(room).emit("PIN_STATUS", msg);
+const handleSpecificPinStatus = (message, topic) => {  
+  try {
+    console.log("[INFO] Received:", JSON.parse(message));
+    const parsedMessage = JSON.parse(message);
+
+    if(!parsedMessage.state){
+      console.warn(`[WARN] Invalid Pin Status message: ${message}`);
+      return; 
+    }
+
+    const topicParts = topic.split("/");
+    const device_id = topicParts[0];
+    const pin_no = topicParts[2];
+
+    const room = `pin-status-check-${device_id}`;
+    io.to(room).emit(socketEvents.PIN_STATUS, {
+      device_id,
+      pin_no,
+      state: parsedMessage.state
+    });
+  } catch (error) {
+    console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
+  } 
+  
 };
 
 const handleAck = (message, topic) => {
-  console.log(`Received ack: ${message}`);
-  const msg = JSON.parse(message);
-  const room = `control-device-${msg.id}`;
-  io.to(room).emit("DEVICE-ACK", msg);
+
+
+  
+  try {
+    console.log("[INFO] Received:", JSON.parse(message));
+    const parsedMessage = JSON.parse(message);
+
+    if(!parsedMessage.pin){
+      console.warn(`[WARN] Invalid Pin Ack message: ${message}`);
+      return; 
+    }
+
+    const topicParts = topic.split("/");
+    const device_id = topicParts[0];
+
+    const room = `device-ack-${device_id}`;
+    io.to(room).emit(socketEvents.DEVICE_ACK, {
+      device_id,
+      ...parsedMessage
+    });
+  } catch (error) {
+    console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
+  } 
 };
 
+
 const handleDeviceInfo = (message, topic) => {
-  console.log(`Received info: ${message}`);
-  const msg = JSON.parse(message);
-  const room = `get-info-${msg.id}`;
-  io.to(room).emit("DEVICE-INFO", msg);
+  try {
+    console.log("[INFO] Received:", JSON.parse(message));
+    const parsedMessage = JSON.parse(message);
+
+    if(!parsedMessage.status){
+      console.warn(`[WARN] Invalid Device Info message: ${message}`);
+      return; 
+    }
+
+    const topicParts = topic.split("/");
+    const device_id = topicParts[0];
+
+    const room = `device-info-${device_id}`;
+    io.to(room).emit(socketEvents.DEVICE_INFO, {
+      device_id,
+      ...parsedMessage
+    });
+  } catch (error) {
+    console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
+  } 
 };
 
 // Default handler for unmatched topics
@@ -185,7 +258,7 @@ const topicHandlers = [
   { match: (topic) => topic === "device-discovery", handler: handleDeviceDiscovery },
   { match: (topic) => topic.endsWith("/pins/status"), handler: handlePinStatus },
   { match: (topic) => topic.includes("/pin/") && topic.endsWith("/status"), handler: handleSpecificPinStatus },
-  { match: (topic) => topic.endsWith("/ack"), handler: handleAck },
+  { match: (topic) => topic.endsWith("set/ack"), handler: handleAck },
   { match: (topic) => topic.endsWith("/info"), handler: handleDeviceInfo },
 ];
 
@@ -208,30 +281,30 @@ io.on("connection", (socket) => {
 
   socket.on(socketEvents.DISCOVER_DEVICES, () => {
     console.log(`[INFO] DISCOVER_DEVICES event received from client: ${socket.id}`);
-    console.log(`[ACTION] Joining room: device-discovery`);
+    // console.log(`[ACTION] Joining room: device-discovery`);
 
     socket.join("device-discovery");
     discover();
   });
 
-  socket.on("status-checker", ({ id, pin_no }) => {
-    const room = `status-check-${id}`;
-    console.log(id, pin_no);
+  socket.on(socketEvents.GET_PIN_STATUS, ({ id, pin_no }) => {
+    const room = `pin-status-check-${id}`;
+    console.log(`[INFO] GET_PIN_STATUS event received from client: ${socket.id}`); 
     socket.join(room);
     statuscheck(id, pin_no);
   });
 
-  socket.on("get-info", ({ id }) => {
-    const room = `get-info-${id}`;
-    console.log(id);
+  socket.on(socketEvents.GET_DEVICE_INFO, ({ id }) => {
+    const room = `device-info-${id}`;
+    console.log(`[INFO] GET_DEVICE_INFO event received from client: ${socket.id}`);;
     socket.join(room);
     getInfo(id);
   });
 
-  socket.on("control-device",({id,pin_no,signal})=>{
-    const room=`control-device-${id}`;
+  socket.on(socketEvents.CONTROL_DEVICE,({id,pin_no,state})=>{
+    const room=`device-ack-${id}`;
     socket.join(room);
-    control(id,pin_no,signal);
+    control(id,pin_no,state);
   });
 
   socket.on("disconnect", () => {
