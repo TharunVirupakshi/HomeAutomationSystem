@@ -196,7 +196,7 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
      ```json
      {
       "device_id": "id",
-      "success": true | false,
+      "success": "true | false",
       "pin": 18
      }
      ```
