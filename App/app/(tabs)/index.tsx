@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
 import {COLORS, FONTS} from '../../constants';
 import { CardWithIcon, PressableBtn, PressableWithOpacity } from "@/components";
-import { Link, Stack } from "expo-router";
+import { Link, router, Stack } from "expo-router";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Feather from '@expo/vector-icons/Feather';
@@ -124,10 +124,12 @@ export default function Index() {
   
   const renderRoomCard = ({ item } : renderRoomCardProps) => (
     <View style={styles.roomCard}>
-      <PressableWithOpacity>
-      <Link href={{
-        pathname: '/RoomPage/[roomName]',
-        params: { roomName: item.name }
+      
+      <PressableWithOpacity onPress={()=>{
+        router.push({
+          pathname: '/RoomPage/[roomName]',
+          params: { roomName: item.name }
+        })
       }}>
       <CardWithIcon
         title={item.name}
@@ -139,7 +141,6 @@ export default function Index() {
           }
         }}
       />
-    </Link>
     </PressableWithOpacity>
     </View>
   );

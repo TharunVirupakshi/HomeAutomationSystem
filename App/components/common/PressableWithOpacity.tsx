@@ -1,11 +1,20 @@
 import React, { ReactNode } from "react";
+import { ViewStyle } from "react-native";
+import { PressableProps, StyleProp } from "react-native";
 import { Animated, Pressable} from "react-native";
+import { GestureHandlerGestureEvent } from "react-native-gesture-handler";
+
+
+
 
 interface PressableWithOpacityProps{
-    children: ReactNode
+    children: ReactNode,
+    containerStyle?: StyleProp<ViewStyle>,
+    pressableStyle?: StyleProp<ViewStyle>,
+    onPress?: () => void 
 }
 
-export default function PressableWithOpacity({children} : PressableWithOpacityProps){
+export default function PressableWithOpacity({children, onPress, containerStyle, pressableStyle} : PressableWithOpacityProps){
     const animated = new Animated.Value(1);
 
     const fadeIn = () => {
@@ -24,14 +33,14 @@ export default function PressableWithOpacity({children} : PressableWithOpacityPr
     };
 
     return (
-      <Pressable onPressIn={fadeIn} onPressOut={fadeOut}>
         <Animated.View
-          style={{
-            opacity: animated,
-          }}
+          style={[{
+            opacity: animated
+          },containerStyle]}
         >
+      <Pressable onPress={onPress} onPressIn={fadeIn} onPressOut={fadeOut} style={pressableStyle}>
           {children}
-        </Animated.View>
       </Pressable>
+        </Animated.View>
     );
 }

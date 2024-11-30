@@ -5,7 +5,7 @@ import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOp
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
 import {COLORS, FONTS} from '../../constants';
-import { CardWithIcon, PressableBtn, PressableWithOpacity } from "@/components";
+import { CardWithIcon, ControlCard, PressableBtn, PressableWithOpacity } from "@/components";
 import { Stack } from "expo-router";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
@@ -93,21 +93,14 @@ export default function Room() {
   },[roomName])
 
   const renderControlCard = ({ item } : renderControlCardProps) => (
-    <View style={styles.roomCard}>
-      <PressableWithOpacity>
-      <CardWithIcon
+      <TouchableOpacity style={styles.roomCard}>
+      <ControlCard
         title={item.name}
         subtitle={item.status}
         icon={item.icon}
-        customStyles={{
-          titleStyle:{
-            fontSize: FONTS.size.medium,
-            flexWrap: "wrap"
-          }
-        }}
       />
-    </PressableWithOpacity>
-    </View>
+      </TouchableOpacity>
+    
   );
 
 
@@ -156,21 +149,29 @@ export default function Room() {
 
 const styles = StyleSheet.create({
   columnWrapper: {
-    justifyContent: "space-between", // Space out items in each row
+    // justifyContent: "space-between", // Space out items in each row
     gap: 10
     // marginBottom: 5, // Space between rows
   },
   gridContainer: {
-    gap: 10
+    gap: 10,
+    // borderWidth: 0.5,
+    // borderColor: 'white'
   },
   roomCard: {
     flex: 1, // Ensure even spacing
     // marginHorizontal: 5,
+    // borderWidth: 0.5,
+    // borderColor: 'white',
+    display: "flex",
+    flexDirection: "row",
+    height: 100
+    // alignItems: "center"
   },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 16,
+    // paddingHorizontal: 16,
   },
   customHeader: {
     flexDirection: "row",

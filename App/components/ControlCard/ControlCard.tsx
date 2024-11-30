@@ -4,9 +4,9 @@ import React from 'react';
 import { TextStyle } from 'react-native';
 import { ViewStyle } from 'react-native';
 import { View, Text, StyleSheet } from 'react-native';
-import PressableBtn from './PressableBtn';
 
-interface CardWithIconProps {
+
+interface ControlCardProps {
   title: string;
   subtitle: string;
   btnText?: string;
@@ -18,7 +18,7 @@ interface CardWithIconProps {
   };
 }
 
-const CardWithIcon: React.FC<CardWithIconProps> = ({
+const CardWithIcon: React.FC<ControlCardProps> = ({
   title,
   subtitle,
   btnText,
@@ -32,19 +32,7 @@ const CardWithIcon: React.FC<CardWithIconProps> = ({
         <Text style={[styles.title, customStyles.titleStyle]} numberOfLines={2} ellipsizeMode='middle'>{title}</Text>
         <Text style={[styles.subtitle, customStyles.subtitleStyle]}>{subtitle}</Text>
 
-        {btnText && 
-        <PressableBtn
-          customStyles={{
-            button: {
-              marginTop: 10,
-            },
-            text: {
-              fontFamily: FONTS.medium,
-              includeFontPadding: false,
-            },
-          }}
-          btnText={btnText}
-        />}
+        
         
       </View>
       <View style={styles.iconContainer}>
@@ -75,10 +63,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: "100%"
   },
   title: {
     color: COLORS.text,
-    fontSize: FONTS.size.extraLarge,
+    fontSize: FONTS.size.medium,
+    includeFontPadding: false,
     fontFamily: FONTS.medium,
     flexShrink: 2,
     width: "100%"
