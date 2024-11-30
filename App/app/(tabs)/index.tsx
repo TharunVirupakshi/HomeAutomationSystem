@@ -56,8 +56,8 @@ const header = () => {
               fontFamily: FONTS.medium,
               color: COLORS.text,
               marginRight: 5
-            }}>My Home</Text>
-          <Entypo name="chevron-small-down" size={15} color="white" />
+            }} numberOfLines={1} ellipsizeMode='middle'>My Home</Text>
+          {/* <Entypo name="chevron-small-down" size={15} color="white" /> */}
         </View>
       </PressableWithOpacity>
       </View>

@@ -98,6 +98,7 @@ export default function Room() {
         title={item.name}
         subtitle={item.status}
         icon={item.icon}
+        btnStatus={item.status === "on" ? "on" : "off"}
       />
       </TouchableOpacity>
     
@@ -165,7 +166,7 @@ const styles = StyleSheet.create({
     // borderColor: 'white',
     display: "flex",
     flexDirection: "row",
-    height: 100
+    height: 110
     // alignItems: "center"
   },
   container: {
