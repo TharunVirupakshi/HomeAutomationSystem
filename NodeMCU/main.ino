@@ -3,7 +3,6 @@
 #include <PubSubClient.h>
 
 // Replace with your Wi-Fi and MQTT broker details
-
 const char* wifi_ssid = "Tharun'sGalaxy M32";        // Your Wi-Fi SSID
 const char* wifi_password = "asdfghjkl";     // Your Wi-Fi password
 const char* mqtt_server = "Tharuns-MacBook-Air.local"; // MQTT broker's IP or hostname
@@ -13,46 +12,24 @@ const int mqtt_port = 8883;                  // MQTTS port
 WiFiClientSecure espClient; // Secure Wi-Fi client for MQTTS
 PubSubClient client(espClient);
 
-
 // MQTT credentials (if required)
 const char* mqtt_user = "";
 const char* mqtt_password = "";
 
-
 // Device ID and topics
 const char* device_id = "device_1";
-char config_topic[50];   // "esp32/<device_id>/config"
-char status_topic[50];   // "esp32/<device_id>/status"
-char control_topic[50];  // "esp32/<device_id>/control"
+char config_topic[50];
+char device_info_topic[50];
+// Publish response when a message is received on the topic
+char device_info_response_topic[50];
+const char* device_discovery_topic = "device-discovery";
 
 
-// Function to generate topics
-void generateTopics() {
-  snprintf(config_topic, sizeof(config_topic), "esp32/%s/config", device_id);
-  snprintf(status_topic, sizeof(status_topic), "esp32/%s/status", device_id);
-  snprintf(control_topic, sizeof(control_topic), "esp32/%s/control", device_id);
+void generateTopics(const char* device_id){
+  snprintf(config_topic, sizeof(config_topic), "%s/config", device_id);
+  snprintf(device_info_topic, sizeof(device_info_topic), "%s/info/get", device_id);
+  snprintf(device_info_response_topic, sizeof(device_info_response_topic), "%s/info", device_id);
 }
-
-// GPIO pin states
-const int gpio_pins[] = {4, 5, 16}; // Example pins to configure/control
-int pin_states[sizeof(gpio_pins) / sizeof(gpio_pins[0])] = {0}; // Pin states
-
-// Publish device status
-void publishStatus() {
-  char status_message[200];
-  snprintf(status_message, sizeof(status_message), "{ \"device_id\": \"%s\", \"pins\": {", device_id);
-  for (size_t i = 0; i < sizeof(gpio_pins) / sizeof(gpio_pins[0]); i++) {
-    char pin_status[50];
-    snprintf(pin_status, sizeof(pin_status), "\"%d\": \"%s\"%s", gpio_pins[i], 
-             pin_states[i] ? "HIGH" : "LOW", 
-             (i == sizeof(gpio_pins) / sizeof(gpio_pins[0]) - 1) ? " } }" : ", ");
-    strncat(status_message, pin_status, sizeof(status_message) - strlen(status_message) - 1);
-  }
-  client.publish(status_topic, status_message);
-  Serial.print("Published status: ");
-  Serial.println(status_message);
-}
-
 
 // Broker's certificate
 const char* ca_cert = R"EOF(
@@ -79,59 +56,170 @@ lNbV75YVpfsvRSgyBgjK
 -----END CERTIFICATE-----
 )EOF";
 
-// GPIO pin for control
-const int gpio_pin = 4;
+
+
+// Use the device_id variable for topic subscriptions
+void subscribeToTopics(const char* device_id) {
+  String specific_pin_get_topic = String(device_id) + "/pin/+/get";
+  String all_pins_get_topic = String(device_id) + "/pins/get";
+  String specific_pin_set_topic = String(device_id) + "/pin/+/set";
+  String device_info_topic = String(device_id) + "/info/get";
+  String discovery_topic = "device-discovery/get";
+
+  // Subscribe to the topics
+  client.subscribe(specific_pin_get_topic.c_str());  // Specific pin status requests
+  client.subscribe(all_pins_get_topic.c_str());     // All pins status requests
+  client.subscribe(specific_pin_set_topic.c_str()); // Specific pin state changes
+  client.subscribe(device_info_topic.c_str());      // Device info requests
+  client.subscribe(discovery_topic.c_str());        // Device discovery
+  client.subscribe(config_topic);                   // Config topic (assuming it's global)
+
+  // Debugging - Confirm subscription
+  Serial.printf("Subscribed to topic: %s\n", specific_pin_get_topic.c_str());
+  Serial.printf("Subscribed to topic: %s\n", all_pins_get_topic.c_str());
+  Serial.printf("Subscribed to topic: %s\n", specific_pin_set_topic.c_str());
+  Serial.printf("Subscribed to topic: %s\n", device_info_topic.c_str());
+  Serial.printf("Subscribed to topic: %s\n", discovery_topic.c_str());
+  Serial.printf("Subscribed to topic: %s\n", config_topic);
+}
+
+
+// GPIO pin states
+const int gpio_pins[] = {4, 18, 19}; // Example pins to configure/control
+const int tot_pins = sizeof(gpio_pins) / sizeof(gpio_pins[0]);
+int pin_states[tot_pins] = {0}; // Pin states
+
+int get_pin_indx(int pin){
+  switch(pin){
+    case 4 : return 0;
+    case 18 : return 1;
+    case 19 : return 2;
+    default : return -1;
+  }
+  return -1;
+}
+
+// MQTT Publish Pin State
+void publishPinState(int pin) {
+    int pin_index = get_pin_indx(pin);
+    if(pin_index == -1){
+      Serial.println("Invalid index into gpio_pins");
+      return;
+    }
+    char topic[50];
+    snprintf(topic, sizeof(topic), "%s/pin/%d/status", device_id, gpio_pins[pin_index]);
+    client.publish(topic, pin_states[pin_index] ? "{ \"state\" : \"HIGH\" }" : "{ \"state\" : \"LOW\" }");
+}
+
+// Set Pin State and Publish
+void setPinState(int pin, int state) {
+  int pin_index = get_pin_indx(pin);
+  if(pin_index == -1){
+    Serial.println("Invalid index into gpio_pins");
+    return;
+  }
+  if (pin_states[pin_index] != state) {
+      pin_states[pin_index] = state;
+      digitalWrite(gpio_pins[pin_index], state);
+      publishPinState(pin);
+  }
+}
+
+// Poll Pin States
+void pollPinStates() {
+    for (int i = 0; i < tot_pins; i++) {
+        int current_state = digitalRead(gpio_pins[i]);
+        if (current_state != pin_states[i]) {
+            setPinState(gpio_pins[i], current_state);
+        }
+    }
+}
+
+void getPinStatus(int pin, const char* device_id) {
+  publishPinState(pin);
+}
+
+void getAllPinsStatus(const char* device_id) {
+  String response = "{";
+  for (int pin = 0; pin < 3; pin++) {
+    response += "\"pin" + String(gpio_pins[pin]) + "\":\"" + (digitalRead(gpio_pins[pin]) ? "HIGH" : "LOW") + "\",";
+  }
+  response.remove(response.length() - 1); // Remove trailing comma
+  response += "}";
+  String topic = String(device_id) + "/pins/status";
+  client.publish(topic.c_str(), response.c_str());
+  Serial.printf("Pusblished to: %s\n", topic);
+}
+
+void getDeviceInfo(){
+  String device_info = "{ \"status\": \"ACTIVE\" }"; // Replace with actual info
+  client.publish(device_info_response_topic, device_info.c_str());
+  
+}
+
+void hanldeSetPinState(int pin, const char* state, const char* device_id) {
+  String ack_topic = String(device_id) + "/pin/" + String(pin) + "/set/ack";
+  
+  if(get_pin_indx(pin) == -1){
+    String error_message = "{ \"error\": \"Invalid pin\", \"pin\":" + String(pin)+ " }";
+    client.publish(ack_topic.c_str(), error_message.c_str());
+    return;
+  }
+
+  // Set pin state if it's configured as OUTPUT
+  if (strcmp(state, "HIGH") == 0) {
+    setPinState(pin, 1);
+  } else if (strcmp(state, "LOW") == 0) {
+    setPinState(pin, 0);
+  } else {
+    String error_message = "{ \"error\": \"Invalid state " + String(state) + "\", \"pin\":" + String(pin)+ " }";
+    client.publish(ack_topic.c_str(), error_message.c_str());
+    return;
+  }
+
+  // Send acknowledgment
+  String ack_message = "{ \"success\": true, \"pin\":" + String(pin)+ " }";
+  client.publish(ack_topic.c_str(), ack_message.c_str());
+}
+
+
+void pubToDeviceDiscovery(){
+  String device_info = "{ \"device_id\": \"" + String(device_id) + "\", \"status\": \"ONLINE\" }"; 
+  client.publish(device_discovery_topic, device_info.c_str());
+}
+
 
 // Callback for MQTT messages
-
 void callback(char* topic, byte* payload, unsigned int length) {
+
+  String topic_str = String(topic);
+
   Serial.print("Message arrived on topic: ");
   Serial.println(topic);
-
 
   char message[length + 1];
   memcpy(message, payload, length);
   message[length] = '\0'; // Null-terminate the payload
 
-
   Serial.print("Message: ");
   Serial.println(message);
 
 
-  // Handle control messages
-  if (strcmp(topic, control_topic) == 0) {
-    int pin;
-    char state[10];
-    if (sscanf(message, "{ \"pin\": %d, \"state\": \"%s\" }", &pin, state) == 2) {
-      for (size_t i = 0; i < sizeof(gpio_pins) / sizeof(gpio_pins[0]); i++) {
-        if (gpio_pins[i] == pin) {
-          if (strcmp(state, "HIGH\"") == 0) {
-            digitalWrite(pin, HIGH);
-            pin_states[i] = 1;
-            Serial.printf("Pin %d set to HIGH\n", pin);
-          } else if (strcmp(state, "LOW\"") == 0) {
-            digitalWrite(pin, LOW);
-            pin_states[i] = 0;
-            Serial.printf("Pin %d set to LOW\n", pin);
-          }
-          publishStatus(); // Report status after change
-        }
-      }
-    }else if(strcmp(message, "GET_STATUS") == 0){
-      publishStatus();
-    }
-  }
-  // Handle configuration messages
-  else if (strcmp(topic, config_topic) == 0) {
-    char new_device_id[20];
-    if (sscanf(message, "{ \"device_id\": \"%[^\"]\" }", new_device_id) == 1) {
-      Serial.printf("Device ID updated from %s to %s\n", device_id, new_device_id);
-      device_id = strdup(new_device_id); // Update the device ID
-      generateTopics(); // Regenerate topics
-      client.subscribe(config_topic);
-      client.subscribe(control_topic);
-    }
 
+  if (topic_str.endsWith("/pins/get")) { // Handle get all pins status
+    getAllPinsStatus(device_id);
+  }else if(topic_str.endsWith(("/info/get"))){
+    getDeviceInfo();
+  }else if (topic_str.equals("device-discovery/get")){
+    pubToDeviceDiscovery();
+  }else if (topic_str.endsWith("/get")) {
+    int pin = topic_str.substring(topic_str.indexOf("pin/") + 4, topic_str.lastIndexOf("/get")).toInt();
+    getPinStatus(pin, device_id);
+  }else if (topic_str.endsWith("/set")) {
+    int pin = topic_str.substring(topic_str.indexOf("pin/") + 4, topic_str.lastIndexOf("/set")).toInt();
+    hanldeSetPinState(pin, message, device_id);
+  }else if (strcmp(topic, config_topic) == 0) {
+    
   }
 }
 
@@ -139,21 +227,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTTS connection...");
-
     if (client.connect(device_id, mqtt_user, mqtt_password)) {
       Serial.println("Connected to MQTTS broker!");
 
-      // Subscribe to topics
-      client.subscribe(config_topic);
-      client.subscribe(control_topic);
-
-      Serial.print("Subscribed to: ");
-      Serial.println(config_topic);
-      Serial.println(control_topic);
+      // Subscribe to relevant topics
+      subscribeToTopics(device_id);
 
       // Publish initial status
-      publishStatus();
-
+      getDeviceInfo();
+      getAllPinsStatus(device_id);
+      pubToDeviceDiscovery();
     } else {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
@@ -165,26 +248,24 @@ void reconnect() {
 
 // Configure MQTTS
 void setupMQTT() {
-
    // Generate MQTT topics
-  generateTopics();
+  
   espClient.setCACert(ca_cert); // Load CA certificate
   // espClient.setInsecure();
-
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+  generateTopics(device_id); 
+  subscribeToTopics(device_id);
 }
 
 void setup() {
   Serial.begin(115200);
 
-
   // Config PINS to OUTPUT
-  for (size_t i = 0; i < sizeof(gpio_pins) / sizeof(gpio_pins[0]); i++) {
+  for (int i = 0; i < tot_pins; i++) {
     pinMode(gpio_pins[i], OUTPUT);
     digitalWrite(gpio_pins[i], LOW);
   }
-
 
   // Connect to Wi-Fi
   Serial.print("Connecting to Wi-Fi...");
@@ -207,10 +288,19 @@ void setup() {
   }
 }
 
+unsigned long lastPollTime = 0;
+const unsigned long pollInterval = 500;
+
 void loop() {
   // Handle MQTT
   if (!client.connected()) {
     reconnect();
   }
   client.loop();
+
+  unsigned long currentTime = millis();
+  if (currentTime - lastPollTime >= pollInterval) {
+      lastPollTime = currentTime;
+      pollPinStates(); // Your periodic function
+  }
 }
