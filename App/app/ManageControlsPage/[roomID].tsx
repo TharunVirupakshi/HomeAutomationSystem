@@ -4,6 +4,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { FontAwesome5, FontAwesome6, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { Stack } from "expo-router";
 import { COLORS } from "@/constants";
+import { initializeSocket, socketEvents } from "@/API/masterServer";
 
 
 interface Control {
@@ -11,6 +12,7 @@ interface Control {
   name: string;
   status?: string; // Optional since new controls may not have a status
   icon?: React.ReactNode;
+  device_id?: string
 }
 
 type roomID = keyof typeof dummyData
@@ -52,15 +54,40 @@ const dummyData = {
     },
   };
 
+const socketMS = initializeSocket();
 
+interface Device{
+    device_id: string,
+    status: string
+}
 
 const ManageControlsPage = () => {
+  
   const navigation = useNavigation();
   const route = useRoute();
   const { roomID } = route.params as RouteParams;
 
   const [controls, setControls] = useState<Control[]>()
   const [availableControls, setAvailableControls] = useState<Control[]>([]);
+
+  const [devices, setDevices] = useState<Device[]>([])
+
+  useEffect(()=>{
+    const fetchDevices = async() => {
+        try {
+          socketMS.emit(socketEvents.DISCOVER_DEVICES);
+          socketMS.on(socketEvents.DEVICE_LIST, (msg)=>{
+            console.log("Devices received:", msg);
+            setDevices(msg.devices);
+          })
+        } catch (error) {
+          console.error("Error fetching available controls:", error);
+        }
+    }
+    fetchDevices()
+  },[])
+
+
 
   // Fetch available controls from the Master Server
   useEffect(() => {
@@ -69,17 +96,30 @@ const ManageControlsPage = () => {
         // Replace with your actual fetch logic
         // const response = await fetch("https://example.com/api/available-controls");
          // Dummy data for available controls
-        const dummyAvailableControls: Control[] = [
-            { id: "15", name: "Coffee Maker", status: "off" },
-            { id: "16", name: "Vacuum Cleaner", status: "off" },
-            { id: "17", name: "Smart Curtains", status: "off" },
-            { id: "18", name: "Thermostat", status: "on" },
-            { id: "19", name: "Washing Machine", status: "off" },
-            { id: "20", name: "Humidifier", status: "off" },
-            { id: "21", name: "Humidifier", status: "off" },
-        ];
-        const data: Control[] = dummyAvailableControls;
-        setAvailableControls(data);
+        
+        const data: Control[] = [];
+
+        socketMS.on(socketEvents.PIN_STATUS, (msg)=>{
+            const pins = msg.pins;
+            Object.entries(pins).forEach(([pin, state]) => {
+                data.push({
+                  id: pin,
+                  name: `Pin ${pin}`, // Provide a meaningful name if available
+                  status: state === "HIGH" ? "on" : "off", // Map state to readable format
+                  device_id: msg.device_id
+                });
+              });
+            setAvailableControls([...data]);  
+        })
+
+        devices.forEach((device)=> {
+            socketMS.emit(socketEvents.GET_PIN_STATUS, {
+                id: device.device_id,
+                pin_no: "all"
+            })
+        })
+
+        
         if(dummyData.hasOwnProperty(roomID)){
             setControls(dummyData[roomID].controls)
         }
@@ -89,7 +129,7 @@ const ManageControlsPage = () => {
     }
 
     fetchControls();
-  }, []);
+  }, [devices]);
 
   const renderExistingControl = ({ item }: { item: Control }) => (
     <View style={styles.controlCard}>

@@ -5,8 +5,8 @@ import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOp
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
 import {COLORS, FONTS} from '../../constants';
-import { CardWithIcon, ControlCard, PressableBtn, PressableWithOpacity } from "@/components";
-import { Stack } from "expo-router";
+import { CardWithIcon, ControlCard, PopUpMenu, PressableBtn, PressableWithOpacity } from "@/components";
+import { router, Stack } from "expo-router";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Feather from '@expo/vector-icons/Feather';
@@ -104,45 +104,76 @@ export default function Room() {
     
   );
 
+  //Modal state
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const toggleMenu = () => setIsMenuVisible(!isMenuVisible) 
 
 
   return (
-    
     <SafeAreaView
       style={{
         flex: 1,
         backgroundColor: COLORS.background,
         paddingHorizontal: 15,
-        paddingTop: 10
+        paddingTop: 10,
       }}
     >
-   
-      <Stack.Screen 
+      <Stack.Screen
         options={{
           headerShown: true,
           title: roomName,
           headerTitleStyle: {
-            color: COLORS.text
+            color: COLORS.text,
           },
-          headerStyle:{
-            backgroundColor: COLORS.background
-         }
+          headerStyle: {
+            backgroundColor: COLORS.background,
+          },
+          headerRight: () => (
+            <Pressable
+              onPressIn={toggleMenu}
+              hitSlop={20}
+            >
+              <Entypo
+                name="dots-three-horizontal"
+                size={18}
+                color={COLORS.text}
+              />
+            </Pressable>
+          ),
         }}
       />
-     
-    <View style={styles.container}>
-      {/* FlashList for displaying controls */}
-      <FlatList
-        data={controls}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        contentContainerStyle={styles.gridContainer}
-        columnWrapperStyle={styles.columnWrapper}
-        renderItem={renderControlCard}
+
+      <PopUpMenu
+        isMenuVisible={isMenuVisible}
+        toggleMenu={toggleMenu}
+        menuOptions={[
+          {
+            label: "Manage controls",
+            onPress: () => {
+              router.push({
+                pathname: '/ManageControlsPage/[roomID]',
+                params: { roomID: roomName }
+              })
+            }
+          },
+          {
+            label: "Rearrange controls",
+            onPress: () => {}
+          }
+        ]}
       />
-    </View>
-  
-     
+
+      <View style={styles.container}>
+        {/* FlashList for displaying controls */}
+        <FlatList
+          data={controls}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.gridContainer}
+          columnWrapperStyle={styles.columnWrapper}
+          renderItem={renderControlCard}
+        />
+      </View>
     </SafeAreaView>
   );
 }
