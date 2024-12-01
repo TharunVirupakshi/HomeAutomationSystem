@@ -85,6 +85,9 @@ const ManageControlsPage = () => {
         }
     }
     fetchDevices()
+    return () => {
+        socketMS.off(socketEvents.DEVICE_LIST);
+    };
   },[])
 
 
@@ -104,7 +107,7 @@ const ManageControlsPage = () => {
             Object.entries(pins).forEach(([pin, state]) => {
                 data.push({
                   id: pin,
-                  name: `Pin ${pin}`, // Provide a meaningful name if available
+                  name: pin, // Provide a meaningful name if available
                   status: state === "HIGH" ? "on" : "off", // Map state to readable format
                   device_id: msg.device_id
                 });
@@ -129,6 +132,11 @@ const ManageControlsPage = () => {
     }
 
     fetchControls();
+
+    // Cleanup function to remove the listener
+    return () => {
+        socketMS.off(socketEvents.PIN_STATUS);
+    };
   }, [devices]);
 
   const renderExistingControl = ({ item }: { item: Control }) => (

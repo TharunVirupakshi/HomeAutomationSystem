@@ -17,6 +17,7 @@ import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { FontAwesome5, FontAwesome6 } from "@expo/vector-icons";
+import { initializeSocket, socketEvents } from "@/API/masterServer";
 
 
 
@@ -36,7 +37,8 @@ interface Control {
   id: string;
   name: string;
   status: string; // 'on' or 'off'
-  icon?: React.ReactNode
+  icon?: React.ReactNode;
+  device_id?: string
 }
 
 interface renderControlCardProps{
@@ -62,10 +64,12 @@ const dummyData = {
   },
   "Living Room": {
     controls: [
-      { id: "8", name: "TV", status: "off", icon: <FontAwesome6 name="tv" size={25} color="white" /> },
-      { id: "9", name: "AC", status: "on", icon: <FontAwesome5 name="snowflake" size={28} color="white" /> },
-      { id: "10", name: "Ceiling Light", status: "off", icon: <FontAwesome5 name="lightbulb" size={28} color="white" /> },
-      { id: "11", name: "Table Lamp", status: "on", icon: <MaterialCommunityIcons name="lamp-outline" size={35} color="white" /> },
+      // { id: "8", name: "TV", status: "off", icon: <FontAwesome6 name="tv" size={25} color="white" /> },
+      // { id: "9", name: "AC", status: "on", icon: <FontAwesome5 name="snowflake" size={28} color="white" /> },
+      { id: "4", name: "Ceiling Light", status: "off", device_id: "device_1",  icon: <FontAwesome5 name="lightbulb" size={28} color="white" /> },
+      { id: "18", name: "Table Lamp", status: "off", device_id: "device_1", icon: <MaterialCommunityIcons name="lamp-outline" size={35} color="white" /> },
+      { id: "19", name: "Table Lamp 2", status: "off", device_id: "device_1", icon:<MaterialCommunityIcons name="lamp-outline" size={35} color="white" />  },
+      // { id: "11", name: "Table Lamp", status: "on", icon: <MaterialCommunityIcons name="lamp-outline" size={35} color="white" /> },
     ],
   },
   "Bedroom": {
@@ -79,18 +83,73 @@ const dummyData = {
 
 type RoomName = keyof typeof dummyData;
 
+const socketMS = initializeSocket()
+
 export default function Room() {
   const { roomName } = useLocalSearchParams<{roomName: RoomName}>();
 
-  const [controls, setControls ] = useState<Control[]>([]);
-
+  
+  const [controls, setControls ] = useState<Control[]>([])
+  
   useEffect(()=>{
-    
-    if(dummyData.hasOwnProperty(roomName)){
+    if(dummyData.hasOwnProperty(roomName) && controls.length == 0){
       setControls(dummyData[roomName].controls)
     }
-      
-  },[roomName])
+  }, [])
+  
+
+
+  // Fetch and listen for real-time updates
+  useEffect(() => {
+    const handlePinStatus = (msg : {device_id: string, pin_no: string, state: string}) => {
+      console.log("Pin status received:", msg);
+
+      setControls((prevControls) => {
+        // Create a shallow copy of the controls array
+        const updatedControls = [...prevControls];
+        const index = updatedControls.findIndex((item) => item.id === msg.pin_no);
+
+        if (index !== -1) {
+          // Update the status of the matching control
+          updatedControls[index] = {
+            ...updatedControls[index],
+            status: msg.state === "HIGH" ? "on" : "off",
+          };
+        } else {
+          console.warn(`Pin ${msg.pin_no} not found in controls.`);
+        }
+
+        return updatedControls;
+      });
+    };
+
+    // Attach socket listener
+    socketMS.on(socketEvents.PIN_STATUS, handlePinStatus);
+
+    // Request initial statuses for controls
+    if (roomName === "Living Room" && dummyData[roomName]) {
+      dummyData[roomName].controls.forEach((control) => {
+        socketMS.emit(socketEvents.GET_PIN_STATUS, {
+          id: control.device_id,
+          pin_no: control.id,
+        });
+      });
+    }
+
+    // Cleanup listener on unmount
+    return () => {
+      socketMS.off(socketEvents.PIN_STATUS, handlePinStatus);
+    };
+  }, [roomName]);
+
+  function handleControlPin(item: Control): void {
+
+    socketMS.emit(socketEvents.CONTROL_DEVICE, {
+      id: item.device_id,
+      pin_no: item.id,
+      state: item.status === 'on' ? "LOW" : "HIGH"
+    })
+  }
 
   const renderControlCard = ({ item } : renderControlCardProps) => (
       <TouchableOpacity style={styles.roomCard}>
@@ -98,7 +157,8 @@ export default function Room() {
         title={item.name}
         subtitle={item.status}
         icon={item.icon}
-        btnStatus={item.status === "on" ? "on" : "off"}
+        status={item.status === "on" ? "on" : "off"}
+        onPowerBtnPress={() => handleControlPin(item)}
       />
       </TouchableOpacity>
     
@@ -246,3 +306,5 @@ const styles = StyleSheet.create({
     color: 'white',
   },
 });
+
+

@@ -11,29 +11,38 @@ import PressableWithOpacity from '../common/PressableWithOpacity';
 interface ControlCardProps {
   title: string;
   subtitle: string;
-  btnStatus: "on" | "off";
-  icon: React.ReactNode,
+  status: "on" | "off";
+  onPowerBtnPress: () => void;
+  icon: React.ReactNode;
   customStyles?: {
     cardStyle?: ViewStyle;
     titleStyle?: TextStyle;
     subtitleStyle?: TextStyle;
   };
+
 }
 
 const CardWithIcon: React.FC<ControlCardProps> = ({
   title,
   subtitle,
-  btnStatus,
+  status,
   icon,
+  onPowerBtnPress,
   customStyles = {}
 }) => {
 
     const [isOn, setIsOn] = useState(false)
 
     useEffect(() => {
-      if(btnStatus === "on") setIsOn(true)
-      else                   setIsOn(false)
-    }, [btnStatus])
+      if(status === "on") setIsOn(true)
+      else                setIsOn(false)
+    }, [status])
+   
+  
+    const handleOnPress = () => {
+      setIsOn( prev => !prev)
+      onPowerBtnPress();
+    }
     
 
   return (
@@ -69,7 +78,7 @@ const CardWithIcon: React.FC<ControlCardProps> = ({
           }}
         >
           
-          <Pressable hitSlop={20} onPress={()=>setIsOn( prev => !prev)}>
+          <Pressable hitSlop={20} onPress={handleOnPress}>
            <Feather name="power" size={23} color={isOn ? "lightgreen" : "grey"} />
            </Pressable>  
         </View>
