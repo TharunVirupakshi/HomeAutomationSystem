@@ -1,4 +1,5 @@
 import { COLORS, FONTS } from '@/constants';
+import { Entypo } from '@expo/vector-icons';
 import Feather from '@expo/vector-icons/Feather';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import React, { useEffect, useState } from 'react';
@@ -13,6 +14,7 @@ interface ControlCardProps {
   subtitle: string;
   status: "on" | "off";
   onPowerBtnPress: () => void;
+  deviceStatus: string;
   icon: React.ReactNode;
   customStyles?: {
     cardStyle?: ViewStyle;
@@ -28,6 +30,7 @@ const CardWithIcon: React.FC<ControlCardProps> = ({
   status,
   icon,
   onPowerBtnPress,
+  deviceStatus,
   customStyles = {}
 }) => {
 
@@ -42,6 +45,9 @@ const CardWithIcon: React.FC<ControlCardProps> = ({
     const handleOnPress = () => {
       setIsOn( prev => !prev)
       onPowerBtnPress();
+      if(deviceStatus === 'OFFLINE'){
+        setTimeout(()=> setIsOn(false), 2000)
+      } 
     }
     
 
@@ -55,6 +61,7 @@ const CardWithIcon: React.FC<ControlCardProps> = ({
         >
           {title}
         </Text>
+      
         <Text style={[styles.subtitle, customStyles.subtitleStyle]}>
           {subtitle}
         </Text>
@@ -99,6 +106,13 @@ const styles = StyleSheet.create({
     // marginRight: 5,
     // borderColor: "white",
     // borderWidth: 0.5
+    },
+    titleContainer:{
+      flex: 1, 
+      flexDirection: "row",
+      justifyContent: "space-between",
+      // borderColor: "white",
+      // borderWidth: 0.5
     },
   card: {
     backgroundColor: COLORS.card,

@@ -11,7 +11,8 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Array to store device IDs
-const devices = [];
+const devices = [{device_id: "device_1", status: "OFFLINE"}];
+const deviceStatus = {}; // Track status for each device  
 let curid = 0;
 
 // Define broker details
@@ -72,6 +73,34 @@ const discover = () => {
   // subscribe(topics);
   publish("device-discovery/get","discovery request");
 };
+
+const checkDevicesHeartBeat = () => {
+  // Subscribe to the required devices
+  devices.forEach((device) =>  subscribe(`${device.device_id}/info`))
+ 
+  setInterval(() => {
+    devices.forEach((device) => {
+      publish(`${device.device_id}/info/get`, "ping");
+    })
+  }, 10000)
+  setInterval(() => {
+    const now = Date.now();
+    devices.forEach(({ device_id }) => {
+      if (!deviceStatus[device_id] || now - deviceStatus[device_id].lastSeen > 10000) {
+        deviceStatus[device_id] = { online: false };
+      }
+
+      // Publish a message to alert other subscribers of this topic
+      if(!deviceStatus[device_id] || !deviceStatus[device_id].online){
+        publish(`${device_id}/info`, JSON.stringify({ status: "OFFLINE" }))
+      } 
+      console.log(`Device ${device_id} is ${deviceStatus[device_id].online ? "ONLINE" : "OFFLINE"}.`);
+    });
+  }, 10000); // Check every 5 seconds
+}
+
+checkDevicesHeartBeat()
+
 
 // Function to check the status of a device's pin(s)
 const statuscheck = (id, pin_no) => {
@@ -237,6 +266,9 @@ const handleDeviceInfo = (message, topic) => {
 
     const topicParts = topic.split("/");
     const device_id = topicParts[0];
+    
+    if(parsedMessage.status === 'ACTIVE')
+      deviceStatus[device_id] = { online: true, lastSeen: Date.now() };
 
     const room = `device-info-${device_id}`;
     io.to(room).emit(socketEvents.DEVICE_INFO, {

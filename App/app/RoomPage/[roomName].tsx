@@ -1,7 +1,7 @@
 
 import React from "react";
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOpacity, FlatList} from "react-native";
+import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOpacity, FlatList, Alert} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
 import {COLORS, FONTS} from '../../constants';
@@ -90,14 +90,60 @@ export default function Room() {
 
   
   const [controls, setControls ] = useState<Control[]>([])
+  const [devices, setDevices] = useState<{[key: string]: {status: string}}>({}); // Store devices by ID
+
+  
   
   useEffect(()=>{
     if(dummyData.hasOwnProperty(roomName) && controls.length == 0){
       setControls(dummyData[roomName].controls)
     }
   }, [])
-  
 
+  // Initialize WebSocket
+  useEffect(() => {
+      // Subscribe to devices
+    const initialDeviceIds = ['device_1']; // Example device IDs
+    initialDeviceIds.forEach((deviceId) => {
+      socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: deviceId });
+    });
+
+    // Listen for DEVICE_INFO events
+    socketMS.on(socketEvents.DEVICE_INFO, (data) => {
+
+      const { device_id, status } = data;
+      console.log("Device HeartBeat: ", data)
+      setDevices((prevDevices) => ({
+        ...prevDevices,
+        [device_id]: { status },
+      }));
+    });
+
+    return () => {
+      socketMS.off(socketEvents.DEVICE_INFO);
+    };
+  }, []);
+  
+  const updateControls = (id: string, status: string) => {
+    console.log("Updating controls...")
+    setControls((prevControls) => {
+      // Create a shallow copy of the controls array
+      const updatedControls = [...prevControls];
+      const index = updatedControls.findIndex((item) => item.id === id);
+
+      if (index !== -1) {
+        // Update the status of the matching control
+        updatedControls[index] = {
+          ...updatedControls[index],
+          status: status
+        };
+      } else {
+        console.warn(`Pin ${id} not found in controls.`);
+      }
+
+      return updatedControls;
+    });
+  }
 
   // Fetch and listen for real-time updates
   useEffect(() => {
@@ -143,12 +189,29 @@ export default function Room() {
   }, [roomName]);
 
   function handleControlPin(item: Control): void {
+    const deviceId = item.device_id;
 
+    // Check if deviceId is defined
+    if (!deviceId || !devices.hasOwnProperty(deviceId) || devices[deviceId].status === 'OFFLINE') {
+      Alert.alert(
+        'Device Offline',
+        `The device with ID ${deviceId || 'unknown'} seems to be offline.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     socketMS.emit(socketEvents.CONTROL_DEVICE, {
       id: item.device_id,
       pin_no: item.id,
       state: item.status === 'on' ? "LOW" : "HIGH"
     })
+  }
+
+  const getDeviceStatus = (id: any) : string  => {
+    if(devices.hasOwnProperty(id))
+      return devices[id].status
+    else
+      return "OFFLINE"
   }
 
   const renderControlCard = ({ item } : renderControlCardProps) => (
@@ -159,6 +222,7 @@ export default function Room() {
         icon={item.icon}
         status={item.status === "on" ? "on" : "off"}
         onPowerBtnPress={() => handleControlPin(item)}
+        deviceStatus={getDeviceStatus(item.device_id)}
       />
       </TouchableOpacity>
     
