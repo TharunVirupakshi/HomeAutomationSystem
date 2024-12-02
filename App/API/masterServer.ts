@@ -6,47 +6,52 @@ const BASE_URL = "https://your-master-server.com/api";
 const SOCKET_URL = "http://192.168.187.205:3000";
 
 let socket: Socket | null = null;
-let connectionStatusCallback: ((status: boolean) => void) | null = null; // Callback for status updates
+let connectionStatusCallbacks: Array<(status: boolean) => void> = []; // Array to manage multiple callbacks
 
-// Initialize Socket.IO connection
+// Register a callback for connection status changes
+export const onConnectionStatusChange = (callback: (status: boolean) => void) => {
+  connectionStatusCallbacks.push(callback);
+
+  // Immediately notify the current connection status if the socket is initialized
+  if (socket) {
+    callback(socket.connected);
+  }
+
+  // Return a cleanup function to unregister this callback
+  return () => {
+    connectionStatusCallbacks = connectionStatusCallbacks.filter(cb => cb !== callback);
+  };
+};
+
+// Notify all registered callbacks about connection status changes
+const notifyConnectionStatus = (status: boolean) => {
+  connectionStatusCallbacks.forEach(callback => callback(status));
+};
+
+// Initialize the socket connection
 export const initializeSocket = () => {
   if (!socket) {
-    console.log("Connecting to MasterServer via Socket");
+    console.log("Connecting to MasterServer via WebSocket...");
     socket = io(SOCKET_URL, { transports: ["websocket"] });
 
     socket.on("connect", () => {
       console.log("Connected to WebSocket server");
-      if (connectionStatusCallback) connectionStatusCallback(true); // Notify status change
+      notifyConnectionStatus(true); // Notify all registered callbacks
     });
 
     socket.on("disconnect", () => {
       console.log("Disconnected from WebSocket server");
-      if (connectionStatusCallback) connectionStatusCallback(false); // Notify status change
+      notifyConnectionStatus(false); // Notify all registered callbacks
     });
 
-    socket.on("error", (err) => {
-      console.error("Socket error:", err);
-      if (connectionStatusCallback) connectionStatusCallback(false); // Notify status change
+    socket.on("connect_error", (err) => {
+      console.log("WebSocket connection error:", err.message);
+      notifyConnectionStatus(false); // Notify all registered callbacks
     });
-
-    // Notify current connection status immediately after initialization
-    if (connectionStatusCallback) {
-    connectionStatusCallback(socket.connected);
-    }
-  }else if (connectionStatusCallback) connectionStatusCallback(false); // Notify status change
-
+  }
   return socket;
 };
 
-
-// Function to register a callback for connection status changes
-export const onConnectionStatusChange = (callback: (status: boolean) => void) => {
-    connectionStatusCallback = callback;
-    // If the socket is already initialized, immediately notify the current state
-    if (socket) {
-        callback(socket.connected);
-    }
-};
 
 export const socketEvents = {
     // Events for device discovery

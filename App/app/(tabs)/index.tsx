@@ -58,28 +58,30 @@ const dummyRooms = [
   },
 ];
 
-
+const socketMS = initializeSocket()
 
 export default function Index() {
 
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
-   // Define the callback for connection status updates
+  // Define the callback for connection status updates
   const handleConnectionStatusChange = useCallback((status: boolean) => {
-    console.log('web socket connection status changed')
+    console.log("WebSocket connection status changed:", status);
     setIsConnected(status);
   }, []);
 
-  useEffect(()=>{
-    const socket_instance = initializeSocket();
-    setSocket(socket_instance);
-    onConnectionStatusChange(handleConnectionStatusChange);
-    // Register the callback for connection status changes
+  useEffect(() => {
+    // Register the callback
+    const unregisterCallback = onConnectionStatusChange(handleConnectionStatusChange);
+
+    // Initialize the socket connection
+    initializeSocket();
+
+    // Cleanup: Unregister this callback on unmount
     return () => {
-      onConnectionStatusChange(()=>{})
-    }; 
-  }, []);
+      unregisterCallback();
+    };
+  }, [handleConnectionStatusChange]);
 
 
   

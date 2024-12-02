@@ -17,7 +17,8 @@ import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { FontAwesome5, FontAwesome6 } from "@expo/vector-icons";
-import { initializeSocket, socketEvents } from "@/API/masterServer";
+import { initializeSocket, onConnectionStatusChange, socketEvents } from "@/API/masterServer";
+import { Socket } from "socket.io-client";
 
 
 
@@ -83,11 +84,29 @@ const dummyData = {
 
 type RoomName = keyof typeof dummyData;
 
-const socketMS = initializeSocket()
+const socketMS = initializeSocket();
 
 export default function Room() {
   const { roomName } = useLocalSearchParams<{roomName: RoomName}>();
 
+  // const [socketMS, setSocketMS] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+
+   // Define the callback for connection status updates
+  const handleConnectionStatusChange = useCallback((status: boolean) => {
+    console.log('web socket connection status changed')
+    setIsConnected(status);
+  }, []);
+
+  useEffect(()=>{
+    // const socket_instance = initializeSocket();
+    // setSocketMS(socket_instance);
+    onConnectionStatusChange(handleConnectionStatusChange);
+    // Register the callback for connection status changes
+    return () => {
+      onConnectionStatusChange(()=>{})
+    }; 
+  }, []);
   
   const [controls, setControls ] = useState<Control[]>([])
   const [devices, setDevices] = useState<{[key: string]: {status: string}}>({}); // Store devices by ID
@@ -122,7 +141,7 @@ export default function Room() {
     return () => {
       socketMS.off(socketEvents.DEVICE_INFO);
     };
-  }, []);
+  }, [socketMS]);
   
   const updateControls = (id: string, status: string) => {
     console.log("Updating controls...")
@@ -190,6 +209,15 @@ export default function Room() {
 
   function handleControlPin(item: Control): void {
     const deviceId = item.device_id;
+
+    if(!isConnected){
+      Alert.alert(
+        'Master Server Offline',
+        `The Master Server seems to be offline.`,
+        [{ text: 'OK' }]
+      );
+      return; 
+    }
 
     // Check if deviceId is defined
     if (!deviceId || !devices.hasOwnProperty(deviceId) || devices[deviceId].status === 'OFFLINE') {
