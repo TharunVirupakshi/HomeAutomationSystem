@@ -260,7 +260,7 @@ const renderRoomCard = ({ item } : renderRoomCardProps) => (
     
     <PressableWithOpacity onPress={()=>{
       router.push({
-        pathname: '/RoomPage/[roomName]',
+        pathname: '/pages/RoomPage/[roomName]',
         params: { roomName: item.name }
       })
     }}>

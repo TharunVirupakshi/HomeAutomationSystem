@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOpacity, FlatList, Alert} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
-import {COLORS, FONTS} from '../../constants';
+import {COLORS, FONTS} from '../../../constants';
 import { CardWithIcon, ControlCard, PopUpMenu, PressableBtn, PressableWithOpacity } from "@/components";
-import { router, Stack } from "expo-router";
+import { router, Stack, useFocusEffect } from "expo-router";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Feather from '@expo/vector-icons/Feather';
@@ -120,28 +120,29 @@ export default function Room() {
   }, [])
 
   // Initialize WebSocket
-  useEffect(() => {
+  useFocusEffect(
+    useCallback(() => {
       // Subscribe to devices
-    const initialDeviceIds = ['device_1']; // Example device IDs
-    initialDeviceIds.forEach((deviceId) => {
-      socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: deviceId });
-    });
+      const initialDeviceIds = ["device_1"]; // Example device IDs
+      initialDeviceIds.forEach((deviceId) => {
+        socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: deviceId });
+      });
 
-    // Listen for DEVICE_INFO events
-    socketMS.on(socketEvents.DEVICE_INFO, (data) => {
+      // Listen for DEVICE_INFO events
+      socketMS.on(socketEvents.DEVICE_INFO, (data) => {
+        const { device_id, status } = data;
+        console.log("Device HeartBeat: ", data);
+        setDevices((prevDevices) => ({
+          ...prevDevices,
+          [device_id]: { status },
+        }));
+      });
 
-      const { device_id, status } = data;
-      console.log("Device HeartBeat: ", data)
-      setDevices((prevDevices) => ({
-        ...prevDevices,
-        [device_id]: { status },
-      }));
-    });
-
-    return () => {
-      socketMS.off(socketEvents.DEVICE_INFO);
-    };
-  }, [socketMS]);
+      return () => {
+        socketMS.off(socketEvents.DEVICE_INFO);
+      };
+    }, [socketMS])
+  );
   
   const updateControls = (id: string, status: string) => {
     console.log("Updating controls...")
@@ -165,14 +166,21 @@ export default function Room() {
   }
 
   // Fetch and listen for real-time updates
-  useEffect(() => {
-    const handlePinStatus = (msg : {device_id: string, pin_no: string, state: string}) => {
+useFocusEffect(
+  useCallback(() => {
+    const handlePinStatus = (msg: {
+      device_id: string;
+      pin_no: string;
+      state: string;
+    }) => {
       console.log("Pin status received:", msg);
 
       setControls((prevControls) => {
         // Create a shallow copy of the controls array
         const updatedControls = [...prevControls];
-        const index = updatedControls.findIndex((item) => item.id === msg.pin_no);
+        const index = updatedControls.findIndex(
+          (item) => item.id === msg.pin_no
+        );
 
         if (index !== -1) {
           // Update the status of the matching control
@@ -205,7 +213,8 @@ export default function Room() {
     return () => {
       socketMS.off(socketEvents.PIN_STATUS, handlePinStatus);
     };
-  }, [roomName]);
+  }, [roomName])
+);
 
   function handleControlPin(item: Control): void {
     const deviceId = item.device_id;
@@ -303,7 +312,7 @@ export default function Room() {
             label: "Manage controls",
             onPress: () => {
               router.push({
-                pathname: '/ManageControlsPage/[roomID]',
+                pathname: '/pages/ManageControlsPage/[roomID]',
                 params: { roomID: roomName }
               })
             }
