@@ -13,8 +13,9 @@ import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { initializeSocket } from "@/API/masterServer";
+import { initializeSocket, onConnectionStatusChange } from "@/API/masterServer";
 import { Socket } from "socket.io-client";
+
 
 
 
@@ -62,10 +63,25 @@ const dummyRooms = [
 export default function Index() {
 
   const [socket, setSocket] = useState<Socket | null>(null);
-  
-  useEffect(()=>{
-    setSocket(initializeSocket());
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+
+   // Define the callback for connection status updates
+  const handleConnectionStatusChange = useCallback((status: boolean) => {
+    console.log('web socket connection status changed')
+    setIsConnected(status);
   }, []);
+
+  useEffect(()=>{
+    const socket_instance = initializeSocket();
+    setSocket(socket_instance);
+    onConnectionStatusChange(handleConnectionStatusChange);
+    // Register the callback for connection status changes
+    return () => {
+      onConnectionStatusChange(()=>{})
+    }; 
+  }, []);
+
+
   
   const [isMenuVisible, setMenuVisible] = useState(false);
 
@@ -83,7 +99,7 @@ export default function Index() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: header,
+          headerTitle: () => <HeaderComponent isConnected={isConnected}/>,
           headerShadowVisible: false,
           headerStyle: {
             backgroundColor: COLORS.background,
@@ -165,7 +181,7 @@ export default function Index() {
     </SafeAreaView>
   );
 }
-const header = () => {
+const HeaderComponent = ({isConnected} : {isConnected: boolean}) => {
   return (
     <View style={styles.customHeader}>
       <View
@@ -208,12 +224,12 @@ const header = () => {
               color: COLORS.text,
               // borderColor: "white",
               // borderWidth: 0.5,
-              marginRight: 5
+              // marginRight: 5
             }} 
             numberOfLines={1}
             ellipsizeMode='middle'
             >My Home</Text>
-          {/* <Entypo name="chevron-small-down" size={15} color="white" /> */}
+          <Entypo name="dot-single" size={30} color={isConnected ? 'lightgreen' : 'grey'} />
         </View>
       </PressableWithOpacity>
       </View>

@@ -6,6 +6,7 @@ const BASE_URL = "https://your-master-server.com/api";
 const SOCKET_URL = "http://192.168.187.205:3000";
 
 let socket: Socket | null = null;
+let connectionStatusCallback: ((status: boolean) => void) | null = null; // Callback for status updates
 
 // Initialize Socket.IO connection
 export const initializeSocket = () => {
@@ -15,17 +16,36 @@ export const initializeSocket = () => {
 
     socket.on("connect", () => {
       console.log("Connected to WebSocket server");
+      if (connectionStatusCallback) connectionStatusCallback(true); // Notify status change
     });
 
     socket.on("disconnect", () => {
       console.log("Disconnected from WebSocket server");
+      if (connectionStatusCallback) connectionStatusCallback(false); // Notify status change
     });
 
     socket.on("error", (err) => {
       console.error("Socket error:", err);
+      if (connectionStatusCallback) connectionStatusCallback(false); // Notify status change
     });
-  }
+
+    // Notify current connection status immediately after initialization
+    if (connectionStatusCallback) {
+    connectionStatusCallback(socket.connected);
+    }
+  }else if (connectionStatusCallback) connectionStatusCallback(false); // Notify status change
+
   return socket;
+};
+
+
+// Function to register a callback for connection status changes
+export const onConnectionStatusChange = (callback: (status: boolean) => void) => {
+    connectionStatusCallback = callback;
+    // If the socket is already initialized, immediately notify the current state
+    if (socket) {
+        callback(socket.connected);
+    }
 };
 
 export const socketEvents = {
