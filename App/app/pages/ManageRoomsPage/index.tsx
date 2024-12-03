@@ -4,10 +4,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, Stack } from "expo-router";
 import { COLORS, FONTS } from "@/constants";
 
+interface Control {
+  id: string;
+  name: string;
+  status: string; // 'on' or 'off'
+  icon?: React.ReactNode;
+  device_id: string
+}
 interface Room {
   id: string;
   name: string;
-  controls?: {};
+  controls: Control[];
   hide?: boolean;
   icon?: React.ReactNode
 }
@@ -52,8 +59,9 @@ export default function ManageRoomsPage() {
     }
 
     const newRoom: Room = {
-      id: `room_${rooms.length + 1}`,
+      id: `${rooms.length + 1}`,
       name: newRoomName.trim(),
+      controls: []
     };
 
     const updatedRooms = [...rooms, newRoom];
@@ -158,15 +166,17 @@ export default function ManageRoomsPage() {
         renderItem={({ item }) => (
           <TouchableOpacity onPress={()=>{
             router.push({
-                pathname: '/pages/RoomPage/[roomName]',
+                pathname: '/pages/RoomPage/[roomId]',
                 params: {
-                    roomName: item.name 
+                    roomId: item.id 
                 }
             })
           }}>
           <View style={styles.roomItem}>
             <Text style={styles.roomText}>{item.name}</Text>
-            <TouchableOpacity onPress={() => handleRemoveRoom(item.id)}>
+
+            {/* Removing room is disabled just to avoid accidental deletion. */}
+            <TouchableOpacity onPress={() => handleRemoveRoom(item.id)} disabled>
               <Text style={styles.removeText}>Remove</Text>
             </TouchableOpacity>
           </View>
@@ -234,7 +244,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   roomText: {
-    color: COLORS.textLight,
+    color: COLORS.text,
     fontFamily: FONTS.medium,
     fontSize: FONTS.size.medium,
   },

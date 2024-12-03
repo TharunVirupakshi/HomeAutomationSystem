@@ -19,6 +19,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { FontAwesome5, FontAwesome6 } from "@expo/vector-icons";
 import { initializeSocket, onConnectionStatusChange, socketEvents } from "@/API/masterServer";
 import { Socket } from "socket.io-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 
@@ -34,12 +35,22 @@ interface RoomProps {
     params: RoomRouteParams;
   };
 }
+
+
 interface Control {
   id: string;
   name: string;
   status: string; // 'on' or 'off'
   icon?: React.ReactNode;
-  device_id?: string
+  device_id: string
+}
+
+type Room  = {
+  id: string;
+  name: string;
+  controls: Control[];
+  hide?: boolean;
+  icon?: React.ReactNode
 }
 
 interface renderControlCardProps{
@@ -87,7 +98,8 @@ type RoomName = keyof typeof dummyData;
 const socketMS = initializeSocket();
 
 export default function Room() {
-  const { roomName } = useLocalSearchParams<{roomName: RoomName}>();
+  const { roomId } = useLocalSearchParams<{roomId: string}>();
+  const [room, setRoom] = useState<Room | null>(null)
 
   // const [socketMS, setSocketMS] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -111,23 +123,46 @@ export default function Room() {
   const [controls, setControls ] = useState<Control[]>([])
   const [devices, setDevices] = useState<{[key: string]: {status: string}}>({}); // Store devices by ID
 
-  
+   // Utility function to load room by ID
+  const loadRoomById = async (roomId: string) => {
+    try {
+      const storedRooms = await AsyncStorage.getItem("rooms");
+      if (storedRooms) {
+        const rooms = JSON.parse(storedRooms);
+        return rooms.find((r: { id: string }) => r.id === roomId) || null;
+      }
+      return null;
+    } catch (error) {
+      console.error("Failed to load the room:", error);
+      return null;
+    }
+  };
   
   useEffect(()=>{
-    if(dummyData.hasOwnProperty(roomName) && controls.length == 0){
-      setControls(dummyData[roomName].controls)
+    const fetch =async() => {
+      const roomData = await loadRoomById(roomId);
+      if(roomData){
+        setRoom(roomData)
+      }
     }
-  }, [])
+    fetch()
+  }, [roomId])
 
-  // Initialize WebSocket
+  useEffect(()=>{
+    setControls(room?.controls || [])
+  }, [room])
+
+  useEffect(()=>{
+    const device_data: any = {}  
+    room?.controls.forEach(item => { device_data[item.device_id] = false})
+
+    setDevices(device_data);
+  },[room])
+
+  // Initialize WebSockets
   useFocusEffect(
     useCallback(() => {
-      // Subscribe to devices
-      const initialDeviceIds = ["device_1"]; // Example device IDs
-      initialDeviceIds.forEach((deviceId) => {
-        socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: deviceId });
-      });
-
+     
       // Listen for DEVICE_INFO events
       socketMS.on(socketEvents.DEVICE_INFO, (data) => {
         const { device_id, status } = data;
@@ -137,6 +172,10 @@ export default function Room() {
           [device_id]: { status },
         }));
       });
+      
+       // Subscribe to devices
+      Object.keys(devices).forEach((val, index) => socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: index }))
+        
 
       return () => {
         socketMS.off(socketEvents.DEVICE_INFO);
@@ -200,20 +239,20 @@ useFocusEffect(
     socketMS.on(socketEvents.PIN_STATUS, handlePinStatus);
 
     // Request initial statuses for controls
-    if (roomName === "Living Room" && dummyData[roomName]) {
-      dummyData[roomName].controls.forEach((control) => {
+   
+      controls.forEach((control) => {
         socketMS.emit(socketEvents.GET_PIN_STATUS, {
           id: control.device_id,
           pin_no: control.id,
         });
       });
-    }
+    
 
     // Cleanup listener on unmount
     return () => {
       socketMS.off(socketEvents.PIN_STATUS, handlePinStatus);
     };
-  }, [roomName])
+  }, [roomId])
 );
 
   function handleControlPin(item: Control): void {
@@ -282,7 +321,7 @@ useFocusEffect(
       <Stack.Screen
         options={{
           headerShown: true,
-          title: roomName,
+          title: room?.name,
           headerTitleStyle: {
             color: COLORS.text,
           },
@@ -313,7 +352,7 @@ useFocusEffect(
             onPress: () => {
               router.push({
                 pathname: '/pages/ManageControlsPage/[roomID]',
-                params: { roomID: roomName }
+                params: { roomID: roomId }
               })
             }
           },

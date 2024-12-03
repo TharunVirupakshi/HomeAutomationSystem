@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from 'expo-splash-screen';
 import {COLORS, FONTS} from '../../constants';
 import { CardWithIcon, PopUpMenu, PressableBtn, PressableWithOpacity } from "@/components";
-import { Link, router, Stack } from "expo-router";
+import { Link, router, Stack, useFocusEffect } from "expo-router";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Feather from '@expo/vector-icons/Feather';
@@ -27,7 +27,7 @@ interface Control {
   name: string;
   status: string; // 'on' or 'off'
   icon?: React.ReactNode;
-  device_id?: string
+  device_id: string
 }
 
 type Room  = {
@@ -99,9 +99,9 @@ const dummyRoomsPlain = [
     id: "2",
     name: "Kitchen",
     controls: [
-      { id: "1", name: "Oven", status: "off" },
-      { id: "2", name: "Refrigerator Light", status: "on"},
-      { id: "4", name: "Microwave", status: "off" },
+      { id: "4", name: "Oven", status: "off", device_id: "device_1"},
+      { id: "2", name: "Refrigerator Light", status: "on", device_id: "device_2"},
+      { id: "1", name: "Microwave", status: "off", device_id: "device_2" },
     ],
   }
 ];
@@ -109,13 +109,17 @@ const dummyRoomsPlain = [
 
 const saveDummyData = async() => {
   try {
-    const data = dummyRoomsPlain.map(item => {item})
+    const data = dummyRoomsPlain.map(item => (item))
+    console.log("Dummy Rooms",JSON.stringify(data))
     await AsyncStorage.setItem("rooms", JSON.stringify(data))
+    const storedData = await AsyncStorage.getItem("rooms");
+    if(storedData) console.log("Stored Data: ",storedData)
   } catch (error) {
     console.error("Failed to save dummy rooms:", error);
   }
 }
-saveDummyData();
+// Run only once when required
+// saveDummyData(); 
 
 
 
@@ -162,11 +166,12 @@ export default function Index() {
       console.error("Failed to load rooms:", error);
     }
   };
-
-  useEffect(()=>{
-    loadRooms()
-  },[])
-
+  useFocusEffect(
+    useCallback(()=>{
+      loadRooms()
+    },[])
+  )
+  
   return (
     <SafeAreaView
       style={{
@@ -224,7 +229,7 @@ export default function Index() {
 
 
         <FlatList
-          data={dummyRooms}
+          data={rooms}
           renderItem={renderRoomCard}
           keyExtractor={(item) => item.id}
           numColumns={2} // Two columns
@@ -315,8 +320,8 @@ const renderRoomCard = ({ item } : renderRoomCardProps) => (
     
     <PressableWithOpacity onPress={()=>{
       router.push({
-        pathname: '/pages/RoomPage/[roomName]',
-        params: { roomName: item.name }
+        pathname: '/pages/RoomPage/[roomId]',
+        params: { roomId: item.id }
       })
     }}>
     <CardWithIcon
