@@ -15,54 +15,116 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { initializeSocket, onConnectionStatusChange } from "@/API/masterServer";
 import { Socket } from "socket.io-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { isObjectMethod } from "@babel/types";
 
 
 
 
+interface Control {
+  id: string;
+  name: string;
+  status: string; // 'on' or 'off'
+  icon?: React.ReactNode;
+  device_id?: string
+}
 
-type item = {
-  id: string,
-  name: string,
-  controlsCount: number,
+type Room  = {
+  id: string;
+  name: string;
+  controls?: Control[];
+  hide?: boolean;
   icon?: React.ReactNode
-} 
-
+}
 interface renderRoomCardProps{
-  item: item  
+  item: Room 
 }
 
 const dummyRooms = [
   {
     id: "1",
     name: "Living Room",
-    controlsCount: 5,
+    controls: [
+      { id: "4", name: "Ceiling Light", status: "off", device_id: "device_1",  icon: <FontAwesome5 name="lightbulb" size={28} color="white" /> },
+      { id: "18", name: "Table Lamp", status: "off", device_id: "device_1", icon: <MaterialCommunityIcons name="lamp-outline" size={35} color="white" /> },
+      { id: "19", name: "Table Lamp 2", status: "off", device_id: "device_1", icon:<MaterialCommunityIcons name="lamp-outline" size={35} color="white" />  }
+    ],
     icon: <FontAwesome5 name="home" size={24} color="white" />
   },
   {
     id: "2",
     name: "Kitchen",
-    controlsCount: 3,
+    controls: [
+      { id: "1", name: "Oven", status: "off" , icon: <MaterialCommunityIcons name="toaster-oven" size={35} color="white" />},
+      { id: "2", name: "Refrigerator Light", status: "on" , icon: <MaterialIcons name="kitchen" size={35} color="white" />},
+      { id: "3", name: "Dishwasher", status: "off", icon: <MaterialCommunityIcons name="dishwasher" size={35} color="white" /> },
+      { id: "4", name: "Microwave", status: "off", icon: <MaterialCommunityIcons name="toaster-oven" size={35} color="white" /> },
+    ],
     icon: <FontAwesome6 name="kitchen-set" size={24} color="white" />
   },
   {
     id: "3",
     name: "Bedroom",
-    controlsCount: 4,
+    controls: [
+      { id: "12", name: "Bedside Lamp", status: "on", icon: <MaterialCommunityIcons name="lamp-outline" size={35} color="white" /> },
+      { id: "13", name: "Ceiling Fan", status: "off", icon: <MaterialCommunityIcons name="ceiling-fan" size={35} color="white" /> },
+      { id: "14", name: "Smart Speaker", status: "on", icon: <MaterialCommunityIcons name="speaker" size={35} color="white" /> },
+    ],
     icon: <FontAwesome5 name="bed" size={24} color="white" />
   },
   {
     id: "4",
     name: "Bathroom",
-    controlsCount: 2,
+    controls: [
+      { id: "5", name: "Shower Light", status: "on", icon: <MaterialIcons name="shower" size={35} color="white" /> },
+      { id: "6", name: "Exhaust Fan", status: "off", icon: <FontAwesome6 name="fan" size={30} color="white" /> },
+      { id: "7", name: "Heated Mirror", status: "on", icon: <MaterialCommunityIcons name="mirror" size={35} color="white" /> },
+    ],
     icon: <FontAwesome6 name="bath" size={24} color="white" />
   },
 ];
+
+const dummyRoomsPlain = [
+  {
+    id: "1",
+    name: "Living Room",
+    controls: [
+      { id: "4", name: "Ceiling Light", status: "off", device_id: "device_1"},
+      { id: "18", name: "Table Lamp", status: "off", device_id: "device_1"},
+      { id: "19", name: "Table Lamp 2", status: "off", device_id: "device_1"}
+    ]
+  },
+  {
+    id: "2",
+    name: "Kitchen",
+    controls: [
+      { id: "1", name: "Oven", status: "off" },
+      { id: "2", name: "Refrigerator Light", status: "on"},
+      { id: "4", name: "Microwave", status: "off" },
+    ],
+  }
+];
+
+
+const saveDummyData = async() => {
+  try {
+    const data = dummyRoomsPlain.map(item => {item})
+    await AsyncStorage.setItem("rooms", JSON.stringify(data))
+  } catch (error) {
+    console.error("Failed to save dummy rooms:", error);
+  }
+}
+saveDummyData();
+
+
 
 const socketMS = initializeSocket()
 
 export default function Index() {
 
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [rooms, setRooms] = useState<Room[]>([])
 
   // Define the callback for connection status updates
   const handleConnectionStatusChange = useCallback((status: boolean) => {
@@ -88,6 +150,22 @@ export default function Index() {
   const [isMenuVisible, setMenuVisible] = useState(false);
 
   const toggleMenu = () => setMenuVisible(!isMenuVisible);
+
+   // Load rooms from AsyncStorage
+   const loadRooms = async () => {
+    try {
+      const storedRooms = await AsyncStorage.getItem("rooms");
+      if (storedRooms) {
+        setRooms(JSON.parse(storedRooms));
+      }
+    } catch (error) {
+      console.error("Failed to load rooms:", error);
+    }
+  };
+
+  useEffect(()=>{
+    loadRooms()
+  },[])
 
   return (
     <SafeAreaView
@@ -133,7 +211,9 @@ export default function Index() {
           menuOptions={[
             {
               label: "Manage rooms",
-              onPress: () => {}
+              onPress: () => {
+                router.push('/pages/ManageRoomsPage')
+              }
             },
             {
               label: "Rerrange rooms",
@@ -142,31 +222,6 @@ export default function Index() {
           ]}
         />
 
-        {/* <Modal
-          visible={isMenuVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={toggleMenu}
-          style={{
-            // borderColor: "white",
-            // borderWidth: 0.5,
-            backgroundColor: 'transparent'
-          }}
-        >
-          <Pressable
-            style={styles.overlay}
-            onPress={toggleMenu} // Close menu when overlay is clicked
-          >
-            <View style={styles.popupMenu}>
-              <TouchableOpacity style={styles.menuItem} onPress={() => console.log('Option 1 clicked')}>
-                <Text style={styles.menuItemText}>Manage rooms</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem} onPress={() => console.log('Option 2 clicked')}>
-                <Text style={styles.menuItemText}>Rearrange</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Modal> */}
 
         <FlatList
           data={dummyRooms}
@@ -266,8 +321,8 @@ const renderRoomCard = ({ item } : renderRoomCardProps) => (
     }}>
     <CardWithIcon
       title={item.name}
-      subtitle={`${item.controlsCount} controls`}
-      icon={item.icon}
+      subtitle={`${item.controls ? (item.controls).length : 0} controls`}
+      // icon={item.icon}
       customStyles={{
         titleStyle:{
           fontSize: FONTS.size.medium

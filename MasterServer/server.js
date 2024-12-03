@@ -96,7 +96,7 @@ const checkDevicesHeartBeat = () => {
       } 
       console.log(`Device ${device_id} is ${deviceStatus[device_id].online ? "ONLINE" : "OFFLINE"}.`);
     });
-  }, 10000); // Check every 5 seconds
+  }, 10000); // Check every 10 seconds
 }
 
 checkDevicesHeartBeat()

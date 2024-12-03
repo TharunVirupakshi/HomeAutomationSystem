@@ -31,16 +31,16 @@ export default function Settings() {
       <View style={styles.optionContainer}>
         <TouchableOpacity
           style={styles.option}
-          // onPress={() => router.push("/manage-devices")}
+          onPress={() => router.push("/pages/ManageDevicesPage")}
         > 
-          <Text style={styles.optionText}>Manage Devices</Text>
+          <Text style={styles.optionText}>Devices</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.option}
           // onPress={() => router.push("/manage-devices")}
         > 
-          <Text style={styles.optionText}>Manage Master Server</Text>
+          <Text style={styles.optionText}>Master Server</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

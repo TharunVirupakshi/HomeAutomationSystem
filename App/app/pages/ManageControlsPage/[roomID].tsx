@@ -67,6 +67,7 @@ const ManageControlsPage = () => {
   const route = useRoute();
   const { roomID } = route.params as RouteParams;
 
+
   const [controls, setControls] = useState<Control[]>()
   const [availableControls, setAvailableControls] = useState<Control[]>([]);
 
@@ -149,7 +150,7 @@ const ManageControlsPage = () => {
   const renderAvailableControl = ({ item }: { item: Control }) => (
     <Pressable style={styles.controlCard} onPress={() => console.log(`Add ${item.name}`)}>
       <Text style={styles.controlName}>{item.name}</Text>
-      <Text style={styles.controlStatus}>Device ID: device_1</Text>
+      <Text style={styles.controlStatus}>From: {item.device_id}</Text>
     </Pressable>
   );
 
@@ -182,6 +183,14 @@ const ManageControlsPage = () => {
           nestedScrollEnabled
         />
       </View>
+      
+      {/* TODO: 
+      - Show list of available controls. 
+      - Tap any of the controls to add it (should be stored in AsyncStorage of this room) to  Existing controls (of this room)
+      - In existing controls
+         - Rename the control
+         - Remove the control
+      */}
 
       {/* Add New Controls Section */}
       <View>

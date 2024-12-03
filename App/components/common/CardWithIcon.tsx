@@ -10,7 +10,7 @@ interface CardWithIconProps {
   title: string;
   subtitle: string;
   btnText?: string;
-  icon: React.ReactNode,
+  icon?: React.ReactNode,
   customStyles?: {
     cardStyle?: ViewStyle;
     titleStyle?: TextStyle;
