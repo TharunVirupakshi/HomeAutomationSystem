@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { FlatList, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { COLORS, FONTS } from "@/constants";
 import { initializeSocket, socketEvents } from "@/API/masterServer";
+import WifiManager from 'react-native-wifi-reborn'
+
 
 // Local storage
 interface Device {
@@ -15,6 +17,15 @@ interface Device {
 // In-memory 
 interface DeviceStatus {
   [deviceId: string] : boolean
+}
+
+interface WifiEntry {
+  SSID: string;
+  BSSID: string;
+  capabilities: string;
+  frequency: number;
+  level: number;
+  timestamp: number;
 }
 
 const setDummyData = async() => {
@@ -42,6 +53,44 @@ export default function ManageDevicesPage() {
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus>({})
   const [newDeviceName, setNewDeviceName] = useState("");
   const router = useRouter();
+
+  const [wifiList, setWifiList] = useState<WifiEntry[]>([]);
+
+  // Function to request permissions and scan WiFi networks
+  const scanWifiNetworks = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "Location permission is required for WiFi connections",
+            message: "This app needs location permission as this is required to scan for wifi networks.",
+            buttonNegative: "DENY",
+            buttonPositive: "ALLOW",
+          }
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          console.log("Location permission granted");
+          const networks = await WifiManager.loadWifiList();
+          setWifiList(networks);
+          console.log(networks);
+        } else {
+          console.log("Location permission denied");
+        }
+      } else {
+        // iOS will automatically ask for permission
+        const networks = await WifiManager.loadWifiList();
+        setWifiList(networks);
+        console.log(networks);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    scanWifiNetworks();
+  }, []);
 
 
 
