@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { COLORS, FONTS } from "@/constants";
 import { initializeSocket, socketEvents } from "@/API/masterServer";
 import WifiManager from 'react-native-wifi-reborn'
+import axios from "axios";
 
 
 // Local storage
@@ -91,6 +92,47 @@ export default function ManageDevicesPage() {
   useEffect(() => {
     scanWifiNetworks();
   }, []);
+
+  const connectToNetwork = async (SSID : string, psswd : string) => {
+    if (Platform.OS === 'android') {
+      try {
+        const isWifiEnabled = await WifiManager.isEnabled();
+        if (!isWifiEnabled) {
+          // Prompt user to enable WiFi
+          Alert.alert(
+            "WiFi Disabled",
+            "Please enable WiFi to connect.",
+            [
+              { text: "OK", onPress: () => WifiManager.setEnabled(true) }
+            ],
+            { cancelable: false }
+          );
+          return false;
+        }
+        const result = await WifiManager.connectToProtectedSSID(SSID, psswd, false, false);
+        // Get the current IP address from the connection info
+        const connectionInfo = await WifiManager.getCurrentWifiSSID();
+        console.log('Connected to:', connectionInfo);
+        
+        
+        // Send WiFi credentials to the ESP32
+        const url = `http://192.168.4.1/connect?ssid=${encodeURIComponent("itel A25")}&pass=${encodeURIComponent('76652tharun')}`;
+        const response = await axios.get(url);
+        console.log('ESP32 response:', response.data);
+
+        Alert.alert("Connected", "Credentials sent to ESP32");
+
+        return true;
+      } catch (e) {
+        console.error(e);
+        Alert.alert("Error", `${e}`);
+        return false;
+      }
+    } else {
+      // iOS specific code or general notification
+      Alert.alert("Info", "Manual connection required on iOS");
+    }
+  };
 
 
 
@@ -199,6 +241,7 @@ export default function ManageDevicesPage() {
       </View> */}
 
       {/* Devices List */}
+      <View>
       <FlatList
         data={devices}
         keyExtractor={(item) => item.id}
@@ -210,8 +253,30 @@ export default function ManageDevicesPage() {
               </View>
             </TouchableOpacity>
         )}
+        ListHeaderComponent={() => <Text style={styles.header}>Paired Devices</Text>}
         ListEmptyComponent={<Text style={styles.emptyText}>No devices connected.</Text>}
+        stickyHeaderIndices={[0]}
       />
+      </View>
+
+      <View>
+      <FlatList
+        data={wifiList}
+        keyExtractor={(item, index) => item.BSSID + index}
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => connectToNetwork(item.SSID, '123456789')}>
+          <View style={styles.networkItem}>
+            <Text style={styles.networkSSID}>{item.SSID}</Text>
+            <Text style={styles.networkDetails}>Signal Strength: {item.level}dBm</Text>
+          </View>
+          </TouchableOpacity>
+        )}
+        ListHeaderComponent={() => <Text style={styles.header}>Available Networks</Text>}
+        ListEmptyComponent={() => <Text>No networks found</Text>}
+        stickyHeaderIndices={[0]}
+      />
+      </View>
+
     </SafeAreaView>
   );
 }
@@ -222,6 +287,32 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingHorizontal: 15,
     paddingTop: 10,
+  },
+  networkItem: {
+    // flexDirection: "row",
+    // justifyContent: "space-between",
+    // alignItems: "center",
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: COLORS.card
+  },
+  networkSSID: {
+    fontSize: FONTS.size.medium,
+    fontFamily: FONTS.medium,
+    color: COLORS.text
+  },
+  networkDetails: {
+    fontSize: FONTS.size.small,
+    fontFamily: FONTS.medium,
+    color: COLORS.textLight 
+  },
+  header: {
+    fontSize: FONTS.size.small,
+    fontFamily: FONTS.medium,
+    color: COLORS.textLight,
+    backgroundColor: COLORS.background, 
+    paddingVertical: 20
   },
   addDeviceContainer: {
     flexDirection: "row",

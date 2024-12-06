@@ -1,10 +1,27 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <WebServer.h>
+#include <Preferences.h>
+
+Preferences preferences;
+WebServer server(80);
+// Function to handle the root URL
+void handleRoot() {
+  server.send(200, "text/plain", "Send WiFi credentials with /connect?ssid=yourSSID&pass=yourPassword");
+}
 
 // Replace with your Wi-Fi and MQTT broker details
-const char* wifi_ssid = "Tharun'sGalaxy M32";        // Your Wi-Fi SSID
-const char* wifi_password = "asdfghjkl";     // Your Wi-Fi password
+
+// SSID and password for SoftAP
+const char* softAP_ssid = "ESP32-SoftAP";
+const char* softAP_password = "123456789";
+
+const char* wifi_ssid= "";        // Your Wi-Fi SSID
+const char* wifi_password = "";     // Your Wi-Fi password
+
+// char* wifi_ssid = "Tharun'sGalaxy M32";        // Your Wi-Fi SSID
+// char* wifi_password = "asdfghjkl";     // Your Wi-Fi password
 const char* mqtt_server = "Tharuns-MacBook-Air.local"; // MQTT broker's IP or hostname
 const int mqtt_port = 8883;                  // MQTTS port
 
@@ -258,24 +275,18 @@ void setupMQTT() {
   subscribeToTopics(device_id);
 }
 
-void setup() {
-  Serial.begin(115200);
-
-  // Config PINS to OUTPUT
-  for (int i = 0; i < tot_pins; i++) {
-    pinMode(gpio_pins[i], OUTPUT);
-    digitalWrite(gpio_pins[i], LOW);
-  }
-
-  // Connect to Wi-Fi
-  Serial.print("Connecting to Wi-Fi...");
-  WiFi.begin(wifi_ssid, wifi_password);
-
-  int retries = 0;
-  while (WiFi.status() != WL_CONNECTED && retries < 20) {
-    delay(500);
-    Serial.print(".");
-    retries++;
+void wifiSetup(){
+  if (strlen(wifi_ssid) > 0) {
+    
+    // Connect to Wi-Fi
+    Serial.print("Connecting to Wi-Fi...");
+    WiFi.begin(wifi_ssid, wifi_password);
+    int retries = 0;
+    while (WiFi.status() != WL_CONNECTED && retries < 10) {
+      delay(1000);
+      Serial.print(".");
+      retries++;
+    }
   }
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -284,23 +295,78 @@ void setup() {
     Serial.println(WiFi.localIP());
     setupMQTT(); // Set up MQTTS after Wi-Fi connection
   } else {
-    Serial.println("\nFailed to connect to Wi-Fi.");
+    Serial.println("\nFailed to connect to Wi-Fi. Starting SoftAP mode");
+    
+    WiFi.softAP(softAP_ssid, softAP_password); // Start SoftAP mode
+
+    server.on("/", handleRoot);
+    server.on("/connect", handleConnect);
+    server.begin();
+    Serial.print("Access at IP: ");
+    Serial.println(WiFi.softAPIP());
+
   }
+}
+
+
+void handleConnect() {
+  String ssid = server.arg("ssid");
+  String pass = server.arg("pass");
+
+  Serial.print("Credentials received: ");
+  Serial.printf("SSID: %s, Password: %s\n", ssid.c_str(), pass);
+
+  if (ssid.length() > 0 && pass.length() > 0) {
+    // preferences.begin("wifi", false);
+    // preferences.putString("ssid", ssid);
+    // preferences.putString("password", pass);
+    // preferences.end();
+
+    wifi_ssid = ssid.c_str();
+    wifi_password = pass.c_str();
+
+
+    server.send(200, "text/plain", "WiFi credentials saved. Connecting to Wifi");
+    wifiSetup();
+    
+  } else {
+    server.send(400, "text/plain", "Missing ssid or pass parameter.");
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+ 
+  // Config PINS to OUTPUT
+  for (int i = 0; i < tot_pins; i++) {
+    pinMode(gpio_pins[i], OUTPUT);
+    digitalWrite(gpio_pins[i], LOW);
+  }
+
+  wifiSetup();
+   
 }
 
 unsigned long lastPollTime = 0;
 const unsigned long pollInterval = 500;
 
 void loop() {
-  // Handle MQTT
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
 
-  unsigned long currentTime = millis();
-  if (currentTime - lastPollTime >= pollInterval) {
-      lastPollTime = currentTime;
-      pollPinStates(); // Your periodic function
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!client.connected()) {
+      reconnect();  // Reconnect to MQTT broker if disconnected
+    }
+    client.loop();  // Regularly handle MQTT tasks
+
+    unsigned long currentTime = millis();
+    if (currentTime - lastPollTime >= pollInterval) {
+        lastPollTime = currentTime;
+        pollPinStates(); // Your periodic function
+    }
+  } else {
+    // When not connected to WiFi, handle incoming HTTP requests in AP mode
+    server.handleClient();
   }
+  
 }
