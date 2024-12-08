@@ -59,6 +59,7 @@ export default function ManageDevicesPage() {
 
   // Function to request permissions and scan WiFi networks
   const scanWifiNetworks = async () => {
+    console.log("Scanning networks...")
     try {
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
@@ -113,6 +114,9 @@ export default function ManageDevicesPage() {
         // Get the current IP address from the connection info
         const connectionInfo = await WifiManager.getCurrentWifiSSID();
         console.log('Connected to:', connectionInfo);
+
+        const device_info = await axios.get(`http://192.168.4.1/`);
+        console.log('ESP32 Device info: ', device_info)
         
         
         // Send WiFi credentials to the ESP32
@@ -120,7 +124,7 @@ export default function ManageDevicesPage() {
         const response = await axios.get(url);
         console.log('ESP32 response:', response.data);
 
-        Alert.alert("Connected", "Credentials sent to ESP32");
+        Alert.alert("Connected", `Credentials sent to ESP32. Details : ${JSON.stringify(device_info)}`);
 
         return true;
       } catch (e) {
@@ -261,7 +265,7 @@ export default function ManageDevicesPage() {
 
       <View>
       <FlatList
-        data={wifiList}
+        data={wifiList.filter(item => item.SSID.startsWith('ESP32'))}
         keyExtractor={(item, index) => item.BSSID + index}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => connectToNetwork(item.SSID, '123456789')}>

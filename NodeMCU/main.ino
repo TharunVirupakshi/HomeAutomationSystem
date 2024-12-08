@@ -3,13 +3,12 @@
 #include <PubSubClient.h>
 #include <WebServer.h>
 #include <Preferences.h>
+#include <ArduinoJson.h> 
 
 Preferences preferences;
 WebServer server(80);
 // Function to handle the root URL
-void handleRoot() {
-  server.send(200, "text/plain", "Send WiFi credentials with /connect?ssid=yourSSID&pass=yourPassword");
-}
+
 
 // Replace with your Wi-Fi and MQTT broker details
 
@@ -275,67 +274,125 @@ void setupMQTT() {
   subscribeToTopics(device_id);
 }
 
-void wifiSetup(){
-  if (strlen(wifi_ssid) > 0) {
-    
-    // Connect to Wi-Fi
-    Serial.print("Connecting to Wi-Fi...");
-    WiFi.begin(wifi_ssid, wifi_password);
-    int retries = 0;
-    while (WiFi.status() != WL_CONNECTED && retries < 10) {
-      delay(1000);
-      Serial.print(".");
-      retries++;
-    }
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWi-Fi connected!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-    setupMQTT(); // Set up MQTTS after Wi-Fi connection
-  } else {
-    Serial.println("\nFailed to connect to Wi-Fi. Starting SoftAP mode");
-    
-    WiFi.softAP(softAP_ssid, softAP_password); // Start SoftAP mode
-
-    server.on("/", handleRoot);
-    server.on("/connect", handleConnect);
-    server.begin();
-    Serial.print("Access at IP: ");
-    Serial.println(WiFi.softAPIP());
-
+void connectToWiFi(const char* ssid, const char* password){
+  Serial.print("Connecting to Wi-Fi...");
+  WiFi.begin(ssid, password);
+  int retries = 0;
+  while (WiFi.status() != WL_CONNECTED && retries < 10) {
+    delay(1000);
+    Serial.print(".");
+    retries++;
   }
 }
 
 
+
+void handleRoot() {
+  const size_t capacity = JSON_OBJECT_SIZE(3) + 100;
+  StaticJsonDocument<capacity> doc;
+
+  // Fill the JSON document
+  doc["message"] = "Send WiFi credentials with /connect?ssid=yourSSID&pass=yourPassword";
+  doc["device_id"] = device_id; // Assuming 'device_id' is globally defined and is a string
+  doc["mac_address"] = WiFi.macAddress(); // Gets the MAC address of the ESP's WiFi station
+  doc["ip_address"] = WiFi.softAPIP();
+
+  String jsonStr;
+  serializeJson(doc, jsonStr); // Serialize the JSON document to a string
+
+  server.send(200, "application/json", jsonStr); // Send the JSON string as a response
+}
+
+
 void handleConnect() {
+
+  if (!preferences.begin("wifi", false)) {
+    Serial.println("Failed to open preferences");
+    server.send(500, "text/plain", "Server error: failed to open preferences.");
+    return;
+  }
+
   String ssid = server.arg("ssid");
-  String pass = server.arg("pass");
+  String password = server.arg("pass");
+
 
   Serial.print("Credentials received: ");
-  Serial.printf("SSID: %s, Password: %s\n", ssid.c_str(), pass);
+  Serial.printf("SSID: %s, Password: %s\n", ssid.c_str(), password.c_str());
 
-  if (ssid.length() > 0 && pass.length() > 0) {
-    // preferences.begin("wifi", false);
-    // preferences.putString("ssid", ssid);
-    // preferences.putString("password", pass);
-    // preferences.end();
+  
 
-    wifi_ssid = ssid.c_str();
-    wifi_password = pass.c_str();
+  if (ssid.length() > 0 && password.length() > 0) {
+    preferences.putString("ssid", ssid);
+    preferences.putString("password", password);
+    preferences.end(); // Close the Preferences after writing
 
-
-    server.send(200, "text/plain", "WiFi credentials saved. Connecting to Wifi");
-    wifiSetup();
-    
+    server.send(200, "text/plain", "Credentials saved. Attempting to connect to WiFi...");
+    connectToWiFi(ssid.c_str(), password.c_str());
   } else {
     server.send(400, "text/plain", "Missing ssid or pass parameter.");
   }
 }
 
+
+
+void setupSoftAPMode(){
+ 
+  WiFi.softAP(softAP_ssid, softAP_password); // Start SoftAP mode
+
+  server.on("/", handleRoot);
+  server.on("/connect", handleConnect);
+  server.begin();
+  Serial.print("Access at IP: ");
+  Serial.println(WiFi.softAPIP());
+}
+
+void connectionSetup(){
+
+  if (!preferences.begin("wifi", false)) {
+    Serial.println("Failed to open preferences");
+    return;
+  }
+
+  preferences.begin("wifi", false);  // Open Preferences with "wifi" namespace. Read-write access.
+
+
+  String ssid = preferences.getString("ssid", "");
+  String password = preferences.getString("password", "");
+  preferences.end(); // Close the Preferences after writing
+
+  if (ssid != "" && password != "") {
+    connectToWiFi(ssid.c_str(), password.c_str());
+    setupMQTT();
+  } else {
+    Serial.println("\nFailed to connect to Wi-Fi. Starting SoftAP mode");
+    setupSoftAPMode();  // No credentials stored, start in AP mode
+  }
+} 
+
+// Function to clear credentials
+void clearCredentials() {
+  if (!preferences.begin("wifi", false)) {
+    Serial.println("Failed to open preferences for clearing.");
+    return;
+  }
+  preferences.clear();
+  preferences.end(); // Make sure to close the Preferences
+  Serial.println("Credentials cleared, restarting...");
+  ESP.restart();  // Restart to apply changes and potentially enter SoftAP mode
+}
+
+// Interrupt Service Routine (ISR)
+void IRAM_ATTR handleInterrupt() {
+  clearCredentials();
+}
+
+const uint8_t RESET_PIN= 21; //Reset Preferences PIN
+
 void setup() {
   Serial.begin(115200);
+  pinMode(RESET_PIN, INPUT_PULLUP);
+   // Setup interrupt pin
+  attachInterrupt(digitalPinToInterrupt(RESET_PIN), handleInterrupt, FALLING); // Trigger on falling edge
 
  
   // Config PINS to OUTPUT
@@ -344,7 +401,7 @@ void setup() {
     digitalWrite(gpio_pins[i], LOW);
   }
 
-  wifiSetup();
+  connectionSetup();
    
 }
 
@@ -357,7 +414,7 @@ void loop() {
     if (!client.connected()) {
       reconnect();  // Reconnect to MQTT broker if disconnected
     }
-    client.loop();  // Regularly handle MQTT tasks
+    client.loop();  // Regularly handle MQTT tasks  
 
     unsigned long currentTime = millis();
     if (currentTime - lastPollTime >= pollInterval) {
