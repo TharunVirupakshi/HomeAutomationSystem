@@ -4,11 +4,51 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const socketEvents = require("./socketEvents");
-const { parse } = require("path");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+const op= require('socket.io-client');
+
+const socket= op('http://localhost:5000');
+
+socket.on('connect', () => {
+  console.log('Connected to the server with ID:', socket.id);
+
+  // Send a message to the server
+  socket.emit('hello', {'id':'1'});
+});
+
+socket.on(socketEvents.DISCOVER_DEVICES, () => {
+  console.log(`[INFO] DISCOVER_DEVICES event received from client: ${socket.id}`);
+  // console.log(`[ACTION] Joining room: device-discovery`);
+
+  discover();
+});
+
+socket.on(socketEvents.GET_PIN_STATUS, ({ id, pin_no }) => {
+  const room = `pin-status-check-${id}`;
+  console.log(`[INFO] GET_PIN_STATUS event received from client: ${socket.id}`); 
+
+  statuscheck(id, pin_no);
+});
+
+socket.on(socketEvents.GET_DEVICE_INFO, ({ id }) => {
+  const room = `device-info-${id}`;
+  console.log(`[INFO] GET_DEVICE_INFO event received from client: ${socket.id}`);;
+
+  getInfo(id);
+});
+
+socket.on(socketEvents.CONTROL_DEVICE,({id,pin_no,state})=>{
+  const room=`device-ack-${id}`;
+  control(id,pin_no,state);
+});
+
+socket.on("disconnect", () => {
+  console.log(`Client disconnected: ${socket.id}`);
+});
 
 // Array to store device IDs
 const devices = [{device_id: "device_1", status: "OFFLINE"}];
@@ -61,16 +101,10 @@ const publish = (topic, message) => {
   });
 };
 
-
-
 subscribe("device-discovery");
-
-
 
 // Function for device discovery
 const discover = () => {
-  // const topics = ["device-discovery", "device-discovery/get"];
-  // subscribe(topics);
   publish("device-discovery/get","discovery request");
 };
 
@@ -99,7 +133,7 @@ const checkDevicesHeartBeat = () => {
   }, 10000); // Check every 10 seconds
 }
 
-checkDevicesHeartBeat()
+// checkDevicesHeartBeat()
 
 
 // Function to check the status of a device's pin(s)
@@ -348,3 +382,5 @@ io.on("connection", (socket) => {
 server.listen(3000, () => {
   console.log("Listening on *:3000");
 });
+
+
