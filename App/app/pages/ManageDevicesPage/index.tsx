@@ -75,7 +75,7 @@ export default function ManageDevicesPage() {
           console.log("Location permission granted");
           const networks = await WifiManager.loadWifiList();
           setWifiList(networks);
-          console.log(networks);
+          networks.forEach(item => console.log(item.SSID))
         } else {
           console.log("Location permission denied");
         }
@@ -90,9 +90,11 @@ export default function ManageDevicesPage() {
     }
   };
 
-  useEffect(() => {
-    scanWifiNetworks();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      scanWifiNetworks();
+    }, [])
+  )
 
   const connectToNetwork = async (SSID : string, psswd : string) => {
     if (Platform.OS === 'android') {
@@ -124,7 +126,7 @@ export default function ManageDevicesPage() {
         const response = await axios.get(url);
         console.log('ESP32 response:', response.data);
 
-        Alert.alert("Connected", `Credentials sent to ESP32. Details : ${JSON.stringify(device_info)}`);
+        Alert.alert("Connected", `Credentials sent to ESP32. Details : ${JSON.stringify(device_info?.data)}`);
 
         return true;
       } catch (e) {
