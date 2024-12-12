@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 // Base URL for the MasterServer (replace with your actual server address)
 const BASE_URL = "https://your-master-server.com/api";
 // const SOCKET_URL = "http://Tharuns-MacBook-Air.local:3000";
-const SOCKET_URL = "http://192.168.187.205:3000";
+const SOCKET_URL = "http://192.168.43.74:3000";
 
 let socket: Socket | null = null;
 let connectionStatusCallbacks: Array<(status: boolean) => void> = []; // Array to manage multiple callbacks
