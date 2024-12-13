@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Modal, PermissionsAndroid, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { COLORS, FONTS } from "@/constants";
@@ -74,7 +74,9 @@ export default function ManageDevicesPage() {
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           console.log("Location permission granted");
           const networks = await WifiManager.loadWifiList();
-          setWifiList(networks);
+          const filteredNetworks = networks.filter(item => item.SSID.startsWith('ESP32'))
+          console.log("Filtered networks: ", filteredNetworks)
+          if(filteredNetworks.length > 0) setWifiList(filteredNetworks);
           networks.forEach(item => console.log(item.SSID))
         } else {
           console.log("Location permission denied");
@@ -90,13 +92,23 @@ export default function ManageDevicesPage() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      scanWifiNetworks();
-    }, [])
-  )
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     scanWifiNetworks();
+  //   }, [])
+  // )
 
-  const connectToNetwork = async (SSID : string, psswd : string) => {
+  useEffect(() => {
+    scanWifiNetworks(); // Initial scan
+
+    const interval = setInterval(async() => {
+        await scanWifiNetworks();
+    }, 10000); // Scan every 20 seconds
+
+    return () => clearInterval(interval); // Cleanup the interval on component unmount
+}, []);
+
+  const connectToDevice = async (SSID : string, psswd : string) => {
     if (Platform.OS === 'android') {
       try {
         const isWifiEnabled = await WifiManager.isEnabled();
@@ -120,14 +132,11 @@ export default function ManageDevicesPage() {
         const device_info = await axios.get(`http://192.168.4.1/`);
         console.log('ESP32 Device info: ', device_info)
         
-        
-        // Send WiFi credentials to the ESP32
-        const url = `http://192.168.4.1/connect?ssid=${encodeURIComponent("itel A25")}&pass=${encodeURIComponent('76652tharun')}`;
-        const response = await axios.get(url);
-        console.log('ESP32 response:', response.data);
-
-        Alert.alert("Connected", `Credentials sent to ESP32. Details : ${JSON.stringify(device_info?.data)}`);
-
+        Alert.alert("Connected", `Connected to ESP32. Details : ${JSON.stringify(device_info?.data)}`, 
+        [
+          { text: "OK", onPress: () => setIsModalOpen(true) }
+        ],
+        { cancelable: false });
         return true;
       } catch (e) {
         console.error(e);
@@ -139,6 +148,30 @@ export default function ManageDevicesPage() {
       Alert.alert("Info", "Manual connection required on iOS");
     }
   };
+
+  const connectDeviceToNetwork = async(ssid: string, password: string) => {
+
+    try {
+      // Send WiFi credentials to the ESP32
+      const url = `http://192.168.4.1/connect?ssid=${encodeURIComponent(ssid)}&pass=${encodeURIComponent(password)}`;
+      const response = await axios.get(url);
+      console.log('ESP32 response:', response.data);
+      Alert.alert("Connected", `Credentials sent to ESP32. Details : ${JSON.stringify(response.data)}`, 
+        [
+          { text: "OK", onPress: () => setIsModalOpen(false) }
+        ],
+        { cancelable: false });
+      return true;
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", `${e}`);
+      return false; 
+    } finally{
+      setIsModalOpen(false)
+    }
+   
+  }
+
 
 
 
@@ -221,6 +254,15 @@ export default function ManageDevicesPage() {
     },[devices, socketMS])
   )
 
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [networkSSID, setNetworkSSID] = useState<string>('')
+  const [networkPassword, setNetworkPassword] = useState<string>('')
+  const [selectedDeviceSSID, setSelectedDeviceSSID] = useState<string>('')
+
+  // useEffect(()=>setIsModalOpen(true), []) //To test
+
+  const toggleModal = () => setIsModalOpen(prev => !prev)
+
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen
@@ -267,10 +309,10 @@ export default function ManageDevicesPage() {
 
       <View>
       <FlatList
-        data={wifiList.filter(item => item.SSID.startsWith('ESP32'))}
+        data={wifiList}
         keyExtractor={(item, index) => item.BSSID + index}
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => connectToNetwork(item.SSID, '123456789')}>
+          <TouchableOpacity onPress={() => connectToDevice(item.SSID, '123456789')}>
           <View style={styles.networkItem}>
             <Text style={styles.networkSSID}>{item.SSID}</Text>
             <Text style={styles.networkDetails}>Signal Strength: {item.level}dBm</Text>
@@ -278,16 +320,66 @@ export default function ManageDevicesPage() {
           </TouchableOpacity>
         )}
         ListHeaderComponent={() => <Text style={styles.header}>Available Networks</Text>}
-        ListEmptyComponent={() => <Text>No networks found</Text>}
+        ListEmptyComponent={() => <Text style={{color: COLORS.textLight, textAlign: 'center', marginTop: 40}}>No devices found</Text>}
         stickyHeaderIndices={[0]}
       />
       </View>
 
+      {/* Add Room Section */}
+      <Modal
+        visible={isModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={toggleModal}
+        style={{ backgroundColor: "transparent" }}
+      >
+        <Pressable style={styles.overlay} onPress={toggleModal}>
+        <View style={styles.modalContainer}>
+          <Text style={{color: COLORS.text, paddingVertical: 20, fontFamily: FONTS.light}}>Connect your device to your network</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter SSID of your network"
+            value={networkSSID}
+            onChangeText={setNetworkSSID}
+            placeholderTextColor="grey"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter password of your network"
+            value={networkPassword}
+            onChangeText={setNetworkPassword}
+            placeholderTextColor="grey"
+            textContentType="password"
+            secureTextEntry={true}
+          />
+          <TouchableOpacity style={styles.addButton} onPress={() => connectDeviceToNetwork(networkSSID, networkPassword)}>
+            <Text style={styles.addButtonText}>Connect</Text>
+          </TouchableOpacity>
+        </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    // flex: 1,
+    // height: 100,
+    flexDirection: "column",
+    // alignItems: "center",
+    marginBottom: 20,
+    padding: 20,
+    backgroundColor: 'black'
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    // borderColor: "white",
+    // borderWidth: 0.5,
+    height: '100%'
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -326,23 +418,28 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   input: {
-    flex: 1,
-    padding: 10,
+    // flex: 1,
+    paddingHorizontal: 15,
+    height: 40,
     borderColor: "grey",
     borderWidth: 1,
     borderRadius: 8,
     color: COLORS.text,
-    marginRight: 10,
+    fontFamily: FONTS.extraLight,
+    marginBottom: 10
+    // marginRight: 10,
   },
   addButton: {
     padding: 10,
     // backgroundColor: COLORS.secondary,
     borderRadius: 8,
+    width: "100%"
   },
   addButtonText: {
     color: "#3283d5",
     fontSize: FONTS.size.medium,
     fontFamily: FONTS.medium,
+    textAlign: 'center'
   },
   deviceItem: {
     flexDirection: "row",
