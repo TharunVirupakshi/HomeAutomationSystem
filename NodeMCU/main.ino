@@ -241,8 +241,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 // Reconnect to MQTT broker
 void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Attempting MQTTS connection...");
+  int retries = 0;
+  while (!client.connected() && retries <= 15) {
+    Serial.println("Attempting MQTTS connection...");
+
     if (client.connect(device_id, mqtt_user, mqtt_password)) {
       Serial.println("Connected to MQTTS broker!");
 
@@ -259,6 +261,9 @@ void reconnect() {
       Serial.println(" Trying again in 5 seconds...");
       delay(5000);
     }
+
+    if(WiFi.status() != WL_CONNECTED) return; // EXIT
+    retries++;
   }
 }
 
@@ -326,8 +331,13 @@ void handleConnect() {
     preferences.putString("password", password);
     preferences.end(); // Close the Preferences after writing
 
-    server.send(200, "text/plain", "Credentials saved. Attempting to connect to WiFi...");
-    connectToWiFi(ssid.c_str(), password.c_str());
+    server.send(200, "text/plain", "Credentials saved. Restarting...");
+
+    delay(1000);
+    server.close();
+    delay(1000);
+    ESP.restart();
+    // connectToWiFi(ssid.c_str(), password.c_str());
   } else {
     server.send(400, "text/plain", "Missing ssid or pass parameter.");
   }
@@ -353,21 +363,40 @@ void connectionSetup(){
     return;
   }
 
-  preferences.begin("wifi", false);  // Open Preferences with "wifi" namespace. Read-write access.
-
-
   String ssid = preferences.getString("ssid", "");
   String password = preferences.getString("password", "");
   preferences.end(); // Close the Preferences after writing
 
-  if (ssid != "" && password != "") {
-    connectToWiFi(ssid.c_str(), password.c_str());
-    setupMQTT();
-  } else {
-    Serial.println("\nFailed to connect to Wi-Fi. Starting SoftAP mode");
-    setupSoftAPMode();  // No credentials stored, start in AP mode
-  }
+ 
+    if(WiFi.status() == WL_CONNECTED){
+      setupMQTT();
+    }else{
+
+      if (ssid != "" && password != "") connectToWiFi(ssid.c_str(), password.c_str());
+
+      if(WiFi.status() != WL_CONNECTED){
+        Serial.println("\nFailed to connect to Wi-Fi. Starting SoftAP mode");
+        setupSoftAPMode(); 
+      }
+    }
 } 
+
+const int reconnectInterval = 5000; // Time between reconnect attempts in milliseconds
+unsigned long lastReconnectAttempt = 0;
+
+bool reconnectAttempted = false;
+
+void tryReconnect() {
+
+    reconnectAttempted = true;
+  
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Disconnected from Wi-Fi. Trying to reconnect...");
+      
+      connectionSetup();
+    }
+  
+}
 
 // Function to clear credentials
 void clearCredentials() {
@@ -378,6 +407,7 @@ void clearCredentials() {
   preferences.clear();
   preferences.end(); // Make sure to close the Preferences
   Serial.println("Credentials cleared, restarting...");
+  delay(2000);
   ESP.restart();  // Restart to apply changes and potentially enter SoftAP mode
 }
 
@@ -401,16 +431,22 @@ void setup() {
     digitalWrite(gpio_pins[i], LOW);
   }
 
-  connectionSetup();
+  // connectionSetup();
    
 }
 
 unsigned long lastPollTime = 0;
 const unsigned long pollInterval = 500;
 
+unsigned long lastSoftAPTime = 0;
+const unsigned long softAPInterval = 1*60000; // 2 minute
+
 void loop() {
 
   if (WiFi.status() == WL_CONNECTED) {
+    if(reconnectAttempted) setupMQTT();
+    reconnectAttempted = false;
+
     if (!client.connected()) {
       reconnect();  // Reconnect to MQTT broker if disconnected
     }
@@ -422,8 +458,17 @@ void loop() {
         pollPinStates(); // Your periodic function
     }
   } else {
-    // When not connected to WiFi, handle incoming HTTP requests in AP mode
-    server.handleClient();
+
+    unsigned long currentTime = millis();
+    if (currentTime - lastSoftAPTime >= softAPInterval){
+      Serial.println("SoftAP Timeout. Restarting...");
+      ESP.restart();
+    }
+
+    if(!reconnectAttempted)  tryReconnect(); // Run only once
+     
+    server.handleClient(); // Will run continuously 
   }
+
   
 }

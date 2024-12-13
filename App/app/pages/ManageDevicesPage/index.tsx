@@ -45,7 +45,7 @@ const setDummyData = async() => {
   }
 }
 
-setDummyData()
+// setDummyData()
 
 const socketMS = initializeSocket()
 
