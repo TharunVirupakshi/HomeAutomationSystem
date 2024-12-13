@@ -12,9 +12,13 @@ const io = new Server(server);
 const op= require('socket.io-client');
 
 const socket= op('http://localhost:5000');
+var conn=false;
+var reqId;
 
 socket.on('connect', () => {
-  console.log('Connected to the server with ID:', socket.id);
+  console.log('Connected to the cloud server with ID:', socket.id);
+
+  conn=true;
 
   // Send a message to the server
   socket.emit('hello', {'id':'1'});
@@ -27,21 +31,32 @@ socket.on(socketEvents.DISCOVER_DEVICES, () => {
   discover();
 });
 
-socket.on(socketEvents.GET_PIN_STATUS, ({ id, pin_no }) => {
+socket.on(socketEvents.GET_PIN_STATUS, ({ data}) => {
+  const id=data.id;
+  const pin_no=data.pin_no;
+  reqId=data.requestId;
   const room = `pin-status-check-${id}`;
+  console.log("recieved data",data);
   console.log(`[INFO] GET_PIN_STATUS event received from client: ${socket.id}`); 
 
   statuscheck(id, pin_no);
 });
 
-socket.on(socketEvents.GET_DEVICE_INFO, ({ id }) => {
+socket.on(socketEvents.GET_DEVICE_INFO, ({ data }) => {
+  const id=data.id;
+  reqId=data.requestId;
+  console.log("recieved data",data);
   const room = `device-info-${id}`;
   console.log(`[INFO] GET_DEVICE_INFO event received from client: ${socket.id}`);;
 
   getInfo(id);
 });
 
-socket.on(socketEvents.CONTROL_DEVICE,({id,pin_no,state})=>{
+socket.on(socketEvents.CONTROL_DEVICE,({data})=>{
+  const id=data.id;
+  const pin_no=data.pin_no;
+  const state=data.state;
+  reqId=data.requestId;
   const room=`device-ack-${id}`;
   control(id,pin_no,state);
 });
@@ -133,7 +148,7 @@ const checkDevicesHeartBeat = () => {
   }, 10000); // Check every 10 seconds
 }
 
-// checkDevicesHeartBeat()
+ //checkDevicesHeartBeat()
 
 
 // Function to check the status of a device's pin(s)
@@ -224,6 +239,9 @@ const handlePinStatus = (message, topic) => {
     const topicParts = topic.split("/");
     const device_id = topicParts[0];
 
+    if(conn==true)
+      socket.emit("response",{reqId,...parsedMessage});
+
     const room = `pin-status-check-${device_id}`;
     io.to(room).emit(socketEvents.PIN_STATUS, {
       device_id,
@@ -248,6 +266,9 @@ const handleSpecificPinStatus = (message, topic) => {
     const topicParts = topic.split("/");
     const device_id = topicParts[0];
     const pin_no = topicParts[2];
+
+    if(conn==true)
+      socket.emit("response",{reqId,...parsedMessage});
 
     const room = `pin-status-check-${device_id}`;
     io.to(room).emit(socketEvents.PIN_STATUS, {
@@ -277,6 +298,9 @@ const handleAck = (message, topic) => {
     const topicParts = topic.split("/");
     const device_id = topicParts[0];
 
+     if(conn==true)
+      socket.emit("response",{reqId,...parsedMessage});
+
     const room = `device-ack-${device_id}`;
     io.to(room).emit(socketEvents.DEVICE_ACK, {
       device_id,
@@ -303,6 +327,10 @@ const handleDeviceInfo = (message, topic) => {
     
     if(parsedMessage.status === 'ACTIVE')
       deviceStatus[device_id] = { online: true, lastSeen: Date.now() };
+
+    if(conn==true)
+      socket.emit("response",{reqId,...parsedMessage});
+
 
     const room = `device-info-${device_id}`;
     io.to(room).emit(socketEvents.DEVICE_INFO, {

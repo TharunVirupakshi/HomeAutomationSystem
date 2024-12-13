@@ -200,5 +200,41 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
       "pin": 18
      }
      ```
+### **ESP-to-Cloud Events**
+  Use Postman and connect to `mqtts://localhost:6884` for secure connection. You can create topics, subscribe to topics and publish messages within Postman to test the server.
+1. **`ESP_PING_SERVER`**
+   - **Triggered By**: Sending its id to cloud server on 'devices/info'.
+   - **Payload**:
+     ```json
+     {
+      "device_id": "id",
+      
+     }
+     ```
+2. **`ESP_CONNECT_CLOUD`**
+   - **Triggered By**: client sending request to '/cloud_api/device/master'.
+   - **Payload**:
+     ```json
+     {
+      "device_id": "id",
+      "host_name":"host_name"
+     }
+     ```
+
+3. **`CONTROL_DEVICES`**
+   - **Triggered By**: client sending request to '/cloud_api/devices/connect'.
+   - **Payload**:
+     ```json
+     {
+   "serverId":"1",
+   "topic":"GET_PIN_STATUS",
+   "data":{
+    "id":"1",
+    "pin_no":"all"
+   }
+  }
+     ```
+
+
 
 ---

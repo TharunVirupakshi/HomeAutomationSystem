@@ -3,14 +3,11 @@ version: '3.8'
 services:
   mosquitto:
     image: eclipse-mosquitto
-    container_name: mosquitto
+    container_name: mqtt
     
-
     ports:
-      - "1883:1883"   # Standard MQTT
-      - "8883:8883"   # Secure MQTT (MQTTS)
-      - "9001:9001"   # WebSocket (non-secure, optional if needed)
-      - "8083:8083"   # Secure WebSocket (WSS)
+      - "7883:1883"   # Standard MQTT
+      - "6884:8883"   # Secure MQTT (MQTTS)
     volumes:
       - ./config:/mosquitto/config
       - ./data:/mosquitto/data
@@ -18,8 +15,8 @@ services:
       - ../certificates:/mosquitto/certificates
     restart: unless-stopped
     networks:
-      - mqtt_network_1
+      - mqtt_network_2
 
 networks:
-  mqtt_network_1:
+  mqtt_network_2:
     driver: bridge
