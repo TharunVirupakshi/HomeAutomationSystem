@@ -103,10 +103,11 @@ export default function Room() {
 
   // const [socketMS, setSocketMS] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isListenerAttached, setIsListenerAttached] = useState(false);
 
    // Define the callback for connection status updates
   const handleConnectionStatusChange = useCallback((status: boolean) => {
-    console.log('web socket connection status changed')
+    console.log('web socket connection status changed: ', status)
     setIsConnected(status);
   }, []);
 
@@ -120,7 +121,9 @@ export default function Room() {
     }; 
   }, []);
   
+  
   const [controls, setControls ] = useState<Control[]>([])
+  const [isRoomDataLoaded, setIsRoomDataLoaded] = useState(false);
   const [devices, setDevices] = useState<{[key: string]: {status: string}}>({}); // Store devices by ID
 
    // Utility function to load room by ID
@@ -143,26 +146,33 @@ export default function Room() {
       const roomData = await loadRoomById(roomId);
       if(roomData){
         setRoom(roomData)
+        setControls(roomData?.controls || [])
+        const device_data: any = {}  
+        roomData?.controls.forEach((item : Control) => { device_data[item.device_id] = false})
+
+        setDevices(device_data);
+        setIsRoomDataLoaded(true)
       }
     }
     fetch()
   }, [roomId])
 
-  useEffect(()=>{
-    setControls(room?.controls || [])
-  }, [room])
 
-  useEffect(()=>{
-    const device_data: any = {}  
-    room?.controls.forEach(item => { device_data[item.device_id] = false})
+  // useEffect(()=>{
+  //   console.log("[INFO] Controls: ", controls)
+  // },[controls])
 
-    setDevices(device_data);
-  },[room])
 
-  // Initialize WebSockets
+
+
+
+
   useFocusEffect(
     useCallback(() => {
-     
+      
+      if (!isRoomDataLoaded || !socketMS.connected) return;
+
+      console.log('[INFO] Attaching event listeners')
       // Listen for DEVICE_INFO events
       socketMS.on(socketEvents.DEVICE_INFO, (data) => {
         const { device_id, status } = data;
@@ -172,88 +182,64 @@ export default function Room() {
           [device_id]: { status },
         }));
       });
-      
-       // Subscribe to devices
-      Object.keys(devices).forEach((val, index) => socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: index }))
-        
 
-      return () => {
-        socketMS.off(socketEvents.DEVICE_INFO);
-      };
-    }, [socketMS])
-  );
+
+      // Attach listeners for Pin statuses
+      const handlePinStatus = (msg: {
+        device_id: string;
+        pin_no: string;
+        state: string;
+      }) => {
+        console.log("Pin status received:", msg);
   
-  const updateControls = (id: string, status: string) => {
-    console.log("Updating controls...")
-    setControls((prevControls) => {
-      // Create a shallow copy of the controls array
-      const updatedControls = [...prevControls];
-      const index = updatedControls.findIndex((item) => item.id === id);
-
-      if (index !== -1) {
-        // Update the status of the matching control
-        updatedControls[index] = {
-          ...updatedControls[index],
-          status: status
-        };
-      } else {
-        console.warn(`Pin ${id} not found in controls.`);
-      }
-
-      return updatedControls;
-    });
-  }
-
-  // Fetch and listen for real-time updates
-useFocusEffect(
-  useCallback(() => {
-    const handlePinStatus = (msg: {
-      device_id: string;
-      pin_no: string;
-      state: string;
-    }) => {
-      console.log("Pin status received:", msg);
-
-      setControls((prevControls) => {
-        // Create a shallow copy of the controls array
-        const updatedControls = [...prevControls];
-        const index = updatedControls.findIndex(
-          (item) => item.id === msg.pin_no
-        );
-
-        if (index !== -1) {
-          // Update the status of the matching control
-          updatedControls[index] = {
-            ...updatedControls[index],
-            status: msg.state === "HIGH" ? "on" : "off",
-          };
-        } else {
-          console.warn(`Pin ${msg.pin_no} not found in controls.`);
-        }
-
-        return updatedControls;
-      });
-    };
-
-    // Attach socket listener
-    socketMS.on(socketEvents.PIN_STATUS, handlePinStatus);
-
-    // Request initial statuses for controls
-   
-      controls.forEach((control) => {
-        socketMS.emit(socketEvents.GET_PIN_STATUS, {
-          id: control.device_id,
-          pin_no: control.id,
+        setControls((prevControls) => {
+          const updatedControls = prevControls.map((control) => {
+            if (control.id === msg.pin_no) {
+              return { ...control, status: msg.state === "HIGH" ? "on" : "off" };
+            }
+            return control;
+          });
+          // console.log("Updated: ", updatedControls)
+          return updatedControls;
         });
-      });
-    
+      };
+      socketMS.on(socketEvents.PIN_STATUS, handlePinStatus);
+      
+      setIsListenerAttached(true)
+     
+      return () => {
+        if(socketMS.connected){
+          socketMS.off(socketEvents.DEVICE_INFO)
+          socketMS.off(socketEvents.PIN_STATUS)
+          setIsListenerAttached(false)
+        }  
+      };
+    }, [isRoomDataLoaded, socketMS])
+  );
 
-    // Cleanup listener on unmount
-    return () => {
-      socketMS.off(socketEvents.PIN_STATUS, handlePinStatus);
-    };
-  }, [roomId])
-);
+
+// Trigger initial events
+useEffect(() => {
+
+  if(!isListenerAttached) return;
+
+  // console.log("[INFO] Emitting device status requests... for devices: ", devices);
+  Object.keys(devices).forEach(device_id =>{
+    console.log("[INFO]  Emitting device status requests for: ", device_id)
+    socketMS.emit(socketEvents.GET_DEVICE_INFO, { id:  device_id})
+  } )
+
+  console.log("[INFO] Emitting pin status requests...");
+  controls.forEach((control) => {
+    socketMS.emit(socketEvents.GET_PIN_STATUS, {
+      id: control.device_id,
+      pin_no: control.id,
+    });
+  });
+
+},[isListenerAttached, socketMS])
+  
+ 
 
   function handleControlPin(item: Control): void {
     const deviceId = item.device_id;

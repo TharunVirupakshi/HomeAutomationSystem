@@ -285,7 +285,7 @@ const HeaderComponent = ({isConnected} : {isConnected: boolean}) => {
               fontFamily: FONTS.medium,
               color: COLORS.text,
               // borderColor: "white",
-              // borderWidth: 0.5,
+              borderWidth: 0.5,
               // marginRight: 5
             }} 
             numberOfLines={1}
@@ -355,6 +355,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     fontSize: FONTS.size.medium,
     padding: 2,
+    borderWidth: 0.5,
     includeFontPadding: false
     // paddingVertical: 5
   },

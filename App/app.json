@@ -1,5 +1,6 @@
 {
   "expo": {
+    "platforms": ["ios", "android"],
     "name": "kisel-app",
     "slug": "kisel-app",
     "version": "1.0.0",
@@ -14,7 +15,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tharunvirupakshi.kiselapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -41,7 +43,8 @@
           "resizeMode": "cover",
           "backgroundColor": "#000000"
         }
-      ]
+      ],
+      "react-native-wifi-reborn"
     ],
     "experiments": {
       "typedRoutes": true
@@ -55,5 +58,6 @@
       }
     },
     "owner": "tharunvirupakshi"
+
   }
 }

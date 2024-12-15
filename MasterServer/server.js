@@ -4,6 +4,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const socketEvents = require("./socketEvents");
+const { parse } = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -148,7 +149,7 @@ const checkDevicesHeartBeat = () => {
   }, 10000); // Check every 10 seconds
 }
 
- //checkDevicesHeartBeat()
+checkDevicesHeartBeat()
 
 
 // Function to check the status of a device's pin(s)
