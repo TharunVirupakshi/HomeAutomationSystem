@@ -24,9 +24,11 @@
 */
 
 const {Server} = require('socket.io');
+const http = require("http");
 const express= require('express');
-const app= express();
-const io= new Server(5000);
+const app = express();
+const server = http.createServer(app)
+const io = new Server(server);
 
 app.use(express.json());
 
@@ -46,7 +48,7 @@ const options = {
   rejectUnauthorized: false,
 };
 
-const client= mqtt.connect(options);
+const MQTTclient= mqtt.connect(options);
 
 const EventEmitter = require('events');
 const responseEmitter = new EventEmitter();
@@ -54,38 +56,81 @@ const responseEmitter = new EventEmitter();
 
 //socket for cloud and esp
 // Event: On connection success
-client.on("connect", () => {
-    console.log("Connected to MQTTS broker!");
-  });
-  
-  // Event: On connection error
-  client.on("error", (err) => {
-    console.error("Connection error:", err.message);
-  });
-  
-  const publish = (topic, message) => {
-    client.publish(topic, message, { qos: 0 }, (err) => {
-      if (err) console.error(`Publish error for topic ${topic}:`, err.message);
-      else console.log(`[ACTION] Message published to ${topic}`);
-    });
-  };
+MQTTclient.on("connect", () => {
+    console.log("Connected to MQTT broker!");
+});
 
-  client.subscribe("device/info", { qos: 1 }, (err) => {
+// Event: On connection error
+MQTTclient.on("error", (err) => {
+    console.error("Connection error:", err.message);
+});
+
+const publish = (topic, message) => {
+    MQTTclient.publish(topic, message, {
+        qos: 0
+    }, (err) => {
+        if (err) console.error(`Publish error for topic ${topic}:`, err.message);
+        else console.log(`[ACTION] Message published to ${topic}`);
+    });
+};
+
+MQTTclient.subscribe("device/info", {
+    qos: 1
+}, (err) => {
     if (err) console.error(`Subscription error for topic ${topic}:`, err.message);
     else console.log(`Subscribed to topic`);
-  });
+});
 
-  client.on('message',(topic,data)=>{
-    if(topic==="device/info"){
+MQTTclient.on('message', (topic, data) => {
+    if (topic === "device/info") {
         console.log(data.toString());
         esps.push(data.toString());
     }
-  });
+});
 
 
 // WebSocket setup
 io.on('connection', (socket) => {
     console.log('client connected: ', socket.id);
+
+
+    // Master server emits this event
+    socket.on('REGISTER_MASTER_SERVER', ({masterServerId}) => {
+        const toMaster = `To-${masterServerId}`;
+        socket.join(toMaster);
+        console.log(`Master server ${masterServerId} registered and joined ${toMaster}`);
+    });
+
+    // App emits this event
+    socket.on('CONNECT_TO_MASTER_SERVER', ({masterServerId}) => {
+        const fromMaster = `From-${masterServerId}`;
+        socket.join(fromMaster);
+        console.log(`App joined ${fromMaster}`);
+    });
+
+    // App emits this event
+    socket.on('TO_MASTER_SERVER', ({
+        masterServerId,
+        event,
+        payload
+    }) => {
+        const toMaster = `To-${masterServerId}`;
+        io.to(toMaster).emit(event, payload);
+        console.log(`Message sent to master server ${masterServerId}: ${event}`);
+    });
+
+    // Master server emits this event
+    socket.on('TO_APP', ({
+        masterServerId,
+        event,
+        payload
+    }) => {
+        const fromMaster = `From-${masterServerId}`;
+        io.to(fromMaster).emit(event, payload);
+        console.log(`Message sent from master server ${masterServerId} to app: ${event}`);
+    });
+
+
 
     socket.on('hello', (data) => {
         console.log(data);
@@ -98,6 +143,10 @@ io.on('connection', (socket) => {
         // Emit the response with a unique event key
         responseEmitter.emit(data.reqId, data);
     });
+
+
+
+
 });
 
 //Display and send the list of availiable devices 
@@ -186,6 +235,6 @@ function waitForResponse(requestId) {
 function generateUniqueId() {
     return Math.random().toString(36).substr(2, 9);
 }
-app.listen(8080,()=>{
-    console.log('cloud running on port 8080');
+server.listen(5001,()=>{
+    console.log('cloud running on port 5001');
 });

@@ -9,27 +9,29 @@ async function run() {
         await client.connect();
 
         // Connect to the database
-        const database = client.db('device_management'); // Database name
+        const database = client.db('HomeAutoSys_CloudDB'); // Database name
 
         // Define the collections
         const owners = database.collection('owners');
         const devices = database.collection('devices');
 
-        // Insert sample devices
-        await devices.insertMany([
-            { _id: '1', type: 'server', hostname: 'john-laptop' },
-            { _id: '2', type: 'esp32' },
-        ]);
 
-        // Insert an owner
-        await owners.insertOne({
-            _id: '1',
-            owner_name: 'John Doe',
-            device_ids: ['1', '2'],
-            email: 'john.doe@example.com',
-        });
+        // Dummy data insertion
+        // // Insert sample devices
+        // await devices.insertMany([
+        //     { _id: '1', type: 'server', hostname: 'john-laptop' },
+        //     { _id: '2', type: 'esp32' },
+        // ]);
 
-        console.log('Data inserted successfully!');
+        // // Insert an owner
+        // await owners.insertOne({
+        //     _id: '1',
+        //     owner_name: 'John Doe',
+        //     device_ids: ['1', '2'],
+        //     email: 'john.doe@example.com',
+        // });
+
+        // console.log('Data inserted successfully!');
     } finally {
         // Close the connection
         await client.close();

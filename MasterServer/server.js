@@ -10,10 +10,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const op= require('socket.io-client');
 
-const socket= op('http://localhost:5000');
-var conn=false;
+const op = require('socket.io-client');
+
+const socket = op('http://localhost:5000'); // Cloud server url
+var conn = false;
 var reqId;
 
 socket.on('connect', () => {
@@ -407,7 +408,6 @@ io.on("connection", (socket) => {
   });
 });
 
-//Web socket logic
 server.listen(3000, () => {
   console.log("Listening on *:3000");
 });

@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mosquitto:
     image: eclipse-mosquitto
-    container_name: mosquitto
+    container_name: local_MQTT
     
 
     ports:

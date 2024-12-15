@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mosquitto:
     image: eclipse-mosquitto
-    container_name: mqtt
+    container_name: cloud_MQTT
     
     ports:
       - "7883:1883"   # Standard MQTT
