@@ -23,9 +23,6 @@ cloudSocket.on('connect', () => {
 
   conn=true;
 
-  // // Send a message to the server
-  // cloudSocket.emit('hello', {'id':'1'});
- 
   
   // Register the master server on cloud
   cloudSocket.emit(socketEvents.cloud.REGISTER_MASTER_SERVER, { masterServerId: '1'})
@@ -33,9 +30,31 @@ cloudSocket.on('connect', () => {
   // Attach event listeners
  
   cloudSocket.on(socketEvents.DISCOVER_DEVICES, () => {
-    console.log(`[INFO] DISCOVER_DEVICES event received from cloud`);
+    console.log(`[INFO] DISCOVER_DEVICES event received from CLOUD`);
     // console.log(`[ACTION] Self joining room: device-discovery`);
     discover();
+  });
+
+  
+  cloudSocket.on(socketEvents.GET_PIN_STATUS, ({ id, pin_no }) => {
+    // const room = `pin-status-check-${id}`;
+    // socket.join(room);
+    console.log(`[INFO] GET_PIN_STATUS event received from CLOUD`); 
+    statuscheck(id, pin_no);
+  });
+
+  cloudSocket.on(socketEvents.GET_DEVICE_INFO, ({ id }) => {
+    // const room = `device-info-${id}`;
+    // socket.join(room);
+    console.log(`[INFO] GET_DEVICE_INFO event received from CLOUD`);
+    getInfo(id);
+  });
+
+  cloudSocket.on(socketEvents.CONTROL_DEVICE,({id,pin_no,state})=>{
+    // const room=`device-ack-${id}`;
+    // socket.join(room);
+    console.log(`[INFO] CONTROL_DEVICE event received from CLOUD`);
+    control(id,pin_no,state);
   });
 
 
@@ -248,7 +267,7 @@ const handleDeviceDiscovery = (message) => {
     });
 
     if(cloudSocket.connected){
-      console.log(`[INFO] Sending device-list to Cloud`)
+      console.log(`[INFO] Sending device-list to CLOUD`)
       cloudSocket.emit(socketEvents.cloud.TO_APP, {
         masterServerId: '1',
         event: socketEvents.DEVICE_LIST,
@@ -283,6 +302,21 @@ const handlePinStatus = (message, topic) => {
       device_id,
       pins: parsedMessage
     });
+
+    // Send to cloud
+    if(cloudSocket.connected){
+      console.log(`[INFO] Sending pin-status to CLOUD`)
+      cloudSocket.emit(socketEvents.cloud.TO_APP, {
+        masterServerId: '1',
+        event: socketEvents.PIN_STATUS,
+        payload: {
+          device_id,
+          pins: parsedMessage
+        }
+      })
+    }
+
+
   } catch (error) {
     console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
   } 
@@ -312,6 +346,21 @@ const handleSpecificPinStatus = (message, topic) => {
       pin_no,
       state: parsedMessage.state
     });
+
+    // Send to cloud
+    if(cloudSocket.connected){
+      console.log(`[INFO] Sending pin-status to CLOUD`)
+      cloudSocket.emit(socketEvents.cloud.TO_APP, {
+        masterServerId: '1',
+        event: socketEvents.PIN_STATUS,
+        payload: {
+          device_id,
+          pin_no,
+          state: parsedMessage.state
+        }
+      })
+    }
+
   } catch (error) {
     console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
   } 
@@ -342,6 +391,21 @@ const handleAck = (message, topic) => {
       device_id,
       ...parsedMessage
     });
+
+
+    // Send to cloud
+    if(cloudSocket.connected){
+      console.log(`[INFO] Sending device-ack to CLOUD`)
+      cloudSocket.emit(socketEvents.cloud.TO_APP, {
+        masterServerId: '1',
+        event: socketEvents.DEVICE_ACK,
+        payload: {
+          device_id,
+          ...parsedMessage
+        }
+      })
+    }
+
   } catch (error) {
     console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
   } 
@@ -373,6 +437,21 @@ const handleDeviceInfo = (message, topic) => {
       device_id,
       ...parsedMessage
     });
+
+    // Send to cloud
+    if(cloudSocket.connected){
+      console.log(`[INFO] Sending device-info to CLOUD`)
+      cloudSocket.emit(socketEvents.cloud.TO_APP, {
+        masterServerId: '1',
+        event: socketEvents.DEVICE_INFO,
+        payload: {
+          device_id,
+          ...parsedMessage
+        }
+      })
+    }
+
+
   } catch (error) {
     console.error(`[ERROR] Failed to process pin status message: ${error.message}`);
   } 
