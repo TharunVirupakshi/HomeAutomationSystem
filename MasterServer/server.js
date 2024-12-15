@@ -13,59 +13,79 @@ const io = new Server(server);
 
 const op = require('socket.io-client');
 
-const socket = op('http://localhost:5000'); // Cloud server url
+const cloudSocket = op('http://localhost:5001'); // Cloud server url
+
 var conn = false;
 var reqId;
 
-socket.on('connect', () => {
-  console.log('Connected to the cloud server with ID:', socket.id);
+cloudSocket.on('connect', () => {
+  console.log('Connected to the cloud server with ID:', cloudSocket.id);
 
   conn=true;
 
-  // Send a message to the server
-  socket.emit('hello', {'id':'1'});
+  // // Send a message to the server
+  // cloudSocket.emit('hello', {'id':'1'});
+ 
+  
+  // Register the master server on cloud
+  cloudSocket.emit(socketEvents.cloud.REGISTER_MASTER_SERVER, { masterServerId: '1'})
+
+  // Attach event listeners
+ 
+  cloudSocket.on(socketEvents.DISCOVER_DEVICES, () => {
+    console.log(`[INFO] DISCOVER_DEVICES event received from cloud`);
+    // console.log(`[ACTION] Self joining room: device-discovery`);
+    discover();
+  });
+
+
+  cloudSocket.on('disconnect', ()=>{
+    console.log('Cloud socket connection disconnected');
+    conn = false;
+  })
+
 });
 
-socket.on(socketEvents.DISCOVER_DEVICES, () => {
-  console.log(`[INFO] DISCOVER_DEVICES event received from client: ${socket.id}`);
-  // console.log(`[ACTION] Joining room: device-discovery`);
+// cloudSocket.on(socketEvents.DISCOVER_DEVICES, () => {
+//   console.log(`[INFO] DISCOVER_DEVICES event received from client: ${cloudSocket.id}`);
+//   // console.log(`[ACTION] Joining room: device-discovery`);
 
-  discover();
-});
+//   discover();
+// });
 
-socket.on(socketEvents.GET_PIN_STATUS, ({ data}) => {
-  const id=data.id;
-  const pin_no=data.pin_no;
-  reqId=data.requestId;
-  const room = `pin-status-check-${id}`;
-  console.log("recieved data",data);
-  console.log(`[INFO] GET_PIN_STATUS event received from client: ${socket.id}`); 
+// cloudSocket.on(socketEvents.GET_PIN_STATUS, ({ data}) => {
+//   const id=data.id;
+//   const pin_no=data.pin_no;
+//   reqId=data.requestId;
+//   const room = `pin-status-check-${id}`;
+//   console.log("recieved data",data);
+//   console.log(`[INFO] GET_PIN_STATUS event received from client: ${cloudSocket.id}`); 
 
-  statuscheck(id, pin_no);
-});
+//   statuscheck(id, pin_no);
+// });
 
-socket.on(socketEvents.GET_DEVICE_INFO, ({ data }) => {
-  const id=data.id;
-  reqId=data.requestId;
-  console.log("recieved data",data);
-  const room = `device-info-${id}`;
-  console.log(`[INFO] GET_DEVICE_INFO event received from client: ${socket.id}`);;
+// cloudSocket.on(socketEvents.GET_DEVICE_INFO, ({ data }) => {
+//   const id=data.id;
+//   reqId=data.requestId;
+//   console.log("recieved data",data);
+//   const room = `device-info-${id}`;
+//   console.log(`[INFO] GET_DEVICE_INFO event received from client: ${cloudSocket.id}`);;
 
-  getInfo(id);
-});
+//   getInfo(id);
+// });
 
-socket.on(socketEvents.CONTROL_DEVICE,({data})=>{
-  const id=data.id;
-  const pin_no=data.pin_no;
-  const state=data.state;
-  reqId=data.requestId;
-  const room=`device-ack-${id}`;
-  control(id,pin_no,state);
-});
+// cloudSocket.on(socketEvents.CONTROL_DEVICE,({data})=>{
+//   const id=data.id;
+//   const pin_no=data.pin_no;
+//   const state=data.state;
+//   reqId=data.requestId;
+//   const room=`device-ack-${id}`;
+//   control(id,pin_no,state);
+// });
 
-socket.on("disconnect", () => {
-  console.log(`Client disconnected: ${socket.id}`);
-});
+// cloudSocket.on("disconnect", () => {
+//   console.log(`Client disconnected: ${cloudSocket.id}`);
+// });
 
 // Array to store device IDs
 const devices = [{device_id: "device_1", status: "OFFLINE"}];
@@ -226,6 +246,20 @@ const handleDeviceDiscovery = (message) => {
       message: "Device discovery completed",
       devices: devices,
     });
+
+    if(cloudSocket.connected){
+      console.log(`[INFO] Sending device-list to Cloud`)
+      cloudSocket.emit(socketEvents.cloud.TO_APP, {
+        masterServerId: '1',
+        event: socketEvents.DEVICE_LIST,
+        payload: {
+          success: true,
+          message: "Device discovery completed",
+          devices: devices,
+        } 
+      })
+    }
+
   } catch (error) {
     console.error(`[ERROR] Failed to process discovery message: ${error.message}`);
   }
@@ -241,8 +275,8 @@ const handlePinStatus = (message, topic) => {
     const topicParts = topic.split("/");
     const device_id = topicParts[0];
 
-    if(conn==true)
-      socket.emit("response",{reqId,...parsedMessage});
+    // if(conn==true)
+    //   socket.emit("response",{reqId,...parsedMessage});
 
     const room = `pin-status-check-${device_id}`;
     io.to(room).emit(socketEvents.PIN_STATUS, {
@@ -269,8 +303,8 @@ const handleSpecificPinStatus = (message, topic) => {
     const device_id = topicParts[0];
     const pin_no = topicParts[2];
 
-    if(conn==true)
-      socket.emit("response",{reqId,...parsedMessage});
+    // if(conn==true)
+    //   socket.emit("response",{reqId,...parsedMessage});
 
     const room = `pin-status-check-${device_id}`;
     io.to(room).emit(socketEvents.PIN_STATUS, {
@@ -300,8 +334,8 @@ const handleAck = (message, topic) => {
     const topicParts = topic.split("/");
     const device_id = topicParts[0];
 
-     if(conn==true)
-      socket.emit("response",{reqId,...parsedMessage});
+    //  if(conn==true)
+    //   socket.emit("response",{reqId,...parsedMessage});
 
     const room = `device-ack-${device_id}`;
     io.to(room).emit(socketEvents.DEVICE_ACK, {
@@ -330,8 +364,8 @@ const handleDeviceInfo = (message, topic) => {
     if(parsedMessage.status === 'ACTIVE')
       deviceStatus[device_id] = { online: true, lastSeen: Date.now() };
 
-    if(conn==true)
-      socket.emit("response",{reqId,...parsedMessage});
+    // if(conn==true)
+    //   socket.emit("response",{reqId,...parsedMessage});
 
 
     const room = `device-info-${device_id}`;

@@ -96,14 +96,14 @@ io.on('connection', (socket) => {
 
     // Master server emits this event
     socket.on('REGISTER_MASTER_SERVER', ({masterServerId}) => {
-        const toMaster = `To-${masterServerId}`;
+        const toMaster = `To_MasterServer-${masterServerId}`;
         socket.join(toMaster);
         console.log(`Master server ${masterServerId} registered and joined ${toMaster}`);
     });
 
     // App emits this event
     socket.on('CONNECT_TO_MASTER_SERVER', ({masterServerId}) => {
-        const fromMaster = `From-${masterServerId}`;
+        const fromMaster = `From_MasterServer-${masterServerId}`;
         socket.join(fromMaster);
         console.log(`App joined ${fromMaster}`);
     });
@@ -114,7 +114,7 @@ io.on('connection', (socket) => {
         event,
         payload
     }) => {
-        const toMaster = `To-${masterServerId}`;
+        const toMaster = `To_MasterServer-${masterServerId}`;
         io.to(toMaster).emit(event, payload);
         console.log(`Message sent to master server ${masterServerId}: ${event}`);
     });
@@ -125,7 +125,7 @@ io.on('connection', (socket) => {
         event,
         payload
     }) => {
-        const fromMaster = `From-${masterServerId}`;
+        const fromMaster = `From_MasterServer-${masterServerId}`;
         io.to(fromMaster).emit(event, payload);
         console.log(`Message sent from master server ${masterServerId} to app: ${event}`);
     });

@@ -19,6 +19,14 @@ const socketEvents = {
   
     // General events
     DISCONNECT: "disconnect",
+
+
+    cloud: {
+      // MasterServer-Cloud-App Events
+      REGISTER_MASTER_SERVER: "REGISTER_MASTER_SERVER",
+      TO_APP: "TO_APP"
+    }
+   
   };
   
   module.exports = socketEvents;
