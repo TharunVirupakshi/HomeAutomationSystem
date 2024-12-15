@@ -55,5 +55,6 @@ export default function RootLayout() {
           backgroundColor: COLORS.background
         }
       }}/>
+      
       </Stack>;
 }

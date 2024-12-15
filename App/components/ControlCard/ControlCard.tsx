@@ -1,4 +1,5 @@
 import { COLORS, FONTS } from '@/constants';
+import { Entypo } from '@expo/vector-icons';
 import Feather from '@expo/vector-icons/Feather';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import React, { useEffect, useState } from 'react';
@@ -11,29 +12,43 @@ import PressableWithOpacity from '../common/PressableWithOpacity';
 interface ControlCardProps {
   title: string;
   subtitle: string;
-  btnStatus: "on" | "off";
-  icon: React.ReactNode,
+  status: "on" | "off";
+  onPowerBtnPress: () => void;
+  deviceStatus: string;
+  icon: React.ReactNode;
   customStyles?: {
     cardStyle?: ViewStyle;
     titleStyle?: TextStyle;
     subtitleStyle?: TextStyle;
   };
+
 }
 
 const CardWithIcon: React.FC<ControlCardProps> = ({
   title,
   subtitle,
-  btnStatus,
+  status,
   icon,
+  onPowerBtnPress,
+  deviceStatus,
   customStyles = {}
 }) => {
 
     const [isOn, setIsOn] = useState(false)
 
     useEffect(() => {
-      if(btnStatus === "on") setIsOn(true)
-      else                   setIsOn(false)
-    }, [btnStatus])
+      if(status === "on") setIsOn(true)
+      else                setIsOn(false)
+    }, [status])
+   
+  
+    const handleOnPress = () => {
+      setIsOn( prev => !prev)
+      onPowerBtnPress();
+      if(deviceStatus === 'OFFLINE'){
+        setTimeout(()=> setIsOn(false), 2000)
+      } 
+    }
     
 
   return (
@@ -46,6 +61,7 @@ const CardWithIcon: React.FC<ControlCardProps> = ({
         >
           {title}
         </Text>
+      
         <Text style={[styles.subtitle, customStyles.subtitleStyle]}>
           {subtitle}
         </Text>
@@ -69,7 +85,7 @@ const CardWithIcon: React.FC<ControlCardProps> = ({
           }}
         >
           
-          <Pressable hitSlop={20} onPress={()=>setIsOn( prev => !prev)}>
+          <Pressable hitSlop={20} onPress={handleOnPress}>
            <Feather name="power" size={23} color={isOn ? "lightgreen" : "grey"} />
            </Pressable>  
         </View>
@@ -90,6 +106,13 @@ const styles = StyleSheet.create({
     // marginRight: 5,
     // borderColor: "white",
     // borderWidth: 0.5
+    },
+    titleContainer:{
+      flex: 1, 
+      flexDirection: "row",
+      justifyContent: "space-between",
+      // borderColor: "white",
+      // borderWidth: 0.5
     },
   card: {
     backgroundColor: COLORS.card,

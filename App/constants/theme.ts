@@ -4,7 +4,9 @@ export const COLORS = {
     background: "#000000", // Pure black for AMOLED
     text: "#FFFFFF",
     textLight: "#b4b4b6",
-    card: "#252527",
+    textBlue: "#167DFF",
+    card: "#212121",
+    cardDark: "#151515"
   };
   
   export const FONTS = {
@@ -25,12 +27,15 @@ export const COLORS = {
     extraLightItalic: "Poppins-ExtraLightItalic",
   
     size: {
+      extraSmall: 12,
       small: 14,
       medium: 16,
       large: 20,
       extraLarge: 24,
     },
   };
+
+  
   
 
 
