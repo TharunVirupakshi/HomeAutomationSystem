@@ -1,12 +1,19 @@
 #### MQTT Broker Setup on Docker
 
+>Note: Delete any previous containers to avoid conflicts.
+
 Open the `./MasterServer/MQTTBroker` inside terminal and run
 
 ```
-docker-compose up
+docker compose -p local_mqtt up
 ```
 
-Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` for secure connection. You can create topics, subscribe to topics and publish messages within Postman to test the server.
+Open the `./CloudServer/MQTTBroker` inside another terminal and run
+```
+docker compose -p cloud_mqtt up
+```
+
+Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` (*6884 for Cloud MQTT*) for secure connection. You can create topics, subscribe to topics and publish messages within Postman to test the server.
 
 ##### Subscribe to topics from your client (Postman/ MQTTX)
 `+` is a [MQTT Wildcard](https://www.emqx.com/en/blog/advanced-features-of-mqtt-topics#:~:text=MQTT%20wildcards%20are,(multi%2Dlevel).). 
@@ -200,6 +207,64 @@ Use Postman and connect to `mqtt://localhost:1883` or `mqtts://localhost:8883` f
       "pin": 18
      }
      ```
+
+---
+### Cloud Websockets Tunnel for MasterServer and App
+
+#### MasterServer to Cloud
+1. **`REGISTER_MASTER_SERVER`**
+    -  MasterServer connects to Cloud and emits this event to register itself.
+    - **Payload:**
+    ```json
+    {
+      "masterServerId": "id"
+    }
+    ```
+    -  **Server Action:** 
+        -  Server joins MasterServer to `To_MasterServer-{masterServerId}` room. This is where the cloud relays App messages to MasterServer.
+
+2. **`TO_APP`**
+    - MasterServer emits this event to relay messages to App. 
+    - **Payload:**
+    ```json
+    {
+      "masterServerId": "id",
+      "event": "ANY EVENT",
+      "payload": "ANY PAYLOAD"
+    }
+    ```   
+    -  **Server Action:** 
+        -  Server emits the event specified in the message along with its payload to `From_MasterServer-{masterServerId}` room. This is where the cloud relays MasterServer messages to App.
+
+#### App to Cloud
+
+1. **`CONNECT_TO_MASTER_SERVER`**
+    - App emits this event to connect to MasterServer.
+    - **Payload:**
+    ```json
+    {
+      "masterServerId": "id"
+    }
+    ```
+    -  **Server Action:** 
+        -  Server joins the App to `From_MasterServer-{masterServerId}` room. This is where the cloud relays MasterServer messages to App.
+   
+2. **`TO_MASTER_SERVER`**
+    - App emits this event to relay messages to MasterServer. 
+    - **Payload:**
+    ```json
+    {
+      "masterServerId": "id",
+      "event": "ANY EVENT",
+      "payload": "ANY PAYLOAD"
+    }
+    ```   
+    -  **Server Action:** 
+        -  Server emits the event specified in the message along with its payload to `To_MasterServer-{masterServerId}` room. This is where the cloud relays App messages to MasterServer.
+
+
+---
+
 ### **ESP-to-Cloud Events**
   Use Postman and connect to `mqtts://localhost:6884` for secure connection. You can create topics, subscribe to topics and publish messages within Postman to test the server.
 1. **`ESP_PING_SERVER`**
