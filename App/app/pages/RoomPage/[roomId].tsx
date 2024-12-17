@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useRef } from "react";
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOpacity, FlatList, Alert} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -106,7 +106,17 @@ export default function Room() {
   const { socket, source, initializeSocket, emitEvent, isCloudConnected, isLocalConnected} = useSocket();
 
   const { roomId } = useLocalSearchParams<{roomId: string}>();
-  const [room, setRoom] = useState<Room | null>(null)
+  const [room, setRoom] = useState<Room | null>(null);
+
+  const isLocalConnectedRef = useRef(isLocalConnected);
+  useEffect(() => {
+    isLocalConnectedRef.current = isLocalConnected;
+  }, [isLocalConnected]);
+
+  const isCloudConnectedRef = useRef(isCloudConnected);
+  useEffect(() => {
+    isCloudConnectedRef.current = isCloudConnected;
+  }, [isCloudConnected]);
 
   // const [socketMS, setSocketMS] = useState<Socket | null>(null);
   // const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -152,7 +162,7 @@ export default function Room() {
   const connectToCloud = ()=>{
     initializeSocket('cloud');
     setTimeout(()=>{
-      if(!isCloudConnected){
+      if(!isCloudConnectedRef.current){
         Alert.alert(
           "Cloud Server Unreachable",
           `The Cloud Server seems to be unreachable, try again later.`,
@@ -167,7 +177,7 @@ export default function Room() {
   const connectToLocal = () => {
     initializeSocket('local');
     setTimeout(()=>{
-      if(!isLocalConnected){
+      if(!isLocalConnectedRef.current){
         Alert.alert(
           "Local Master Server Unreachable",
           `The Local Master Server seems to be unreachable, try again later.`,
@@ -318,8 +328,7 @@ useEffect(() => {
       );
       return; 
     }
-
-    if (!isLocalConnected && !isCloudConnected) {
+    else if (source === 'local' && !isLocalConnected) {
       Alert.alert(
         "Master Server Offline",
         `The Master Server seems to be offline, please connect to cloud.`,

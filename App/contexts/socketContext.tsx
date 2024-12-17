@@ -18,6 +18,7 @@ export interface cloudSocketMessage {
 }
 
 const HOST_IP = "192.168.43.74";
+// const SOCKET_URL = `http://${"192.168.43.73"}:3000`;
 const SOCKET_URL = `http://${HOST_IP}:3000`;
 const CLOUD_SOCKET_URL = `http://${HOST_IP}:5001`;
 
@@ -44,7 +45,7 @@ export const SocketProvider = ({ children } : SocketProviderProps) => {
   const connectToSocket = async(url: string, source: string) => {
 
       await disconnectSocket();
-  
+      setSource(source);
 
       const newSocket = io(url, { transports: ["websocket"] });
       
