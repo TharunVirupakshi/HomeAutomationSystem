@@ -3,8 +3,9 @@ import { SafeAreaView, StyleSheet, Text, View, FlatList, TouchableOpacity } from
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useFocusEffect } from "expo-router";
 import { COLORS, FONTS } from "@/constants";
-import { initializeSocket, socketEvents } from "@/API/masterServer";
+import { socketEvents } from "@/API/masterServer";
 import { useRoute } from "@react-navigation/native";
+import { useSocket } from "@/contexts/socketContext";
 
 interface Device {
   id: string;
@@ -16,9 +17,10 @@ interface RouteParams {
     deviceId: string
 }
 
-const socketMS = initializeSocket()
 
 export default function DeviceDetailsPage() {
+  const {socket, isCloudConnected, isLocalConnected, source, initializeSocket, emitEvent} = useSocket();
+
     const route = useRoute();
   const { deviceId } = route.params as RouteParams;
   const [device, setDevice] = useState<Device | null>(null);
@@ -42,18 +44,18 @@ export default function DeviceDetailsPage() {
 
   useFocusEffect(
     useCallback(() => {
-      socketMS.on(socketEvents.DEVICE_INFO, (msg) => {
+      socket?.on(socketEvents.DEVICE_INFO, (msg) => {
         const { device_id, status } = msg;
         console.log("Device HeartBeat: ", msg);
         setDeviceStatus(status === "ACTIVE" ? true : false);
       });
 
-      socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: device?.id });
+      emitEvent(socketEvents.GET_DEVICE_INFO, { id: device?.id });
 
       return () => {
-        socketMS.off(socketEvents.DEVICE_INFO);
+        socket?.off(socketEvents.DEVICE_INFO);
       };
-    }, [device, socketMS])
+    }, [device, socket])
   );
 
   // Listen to pin status updates
@@ -68,18 +70,18 @@ export default function DeviceDetailsPage() {
     };
 
     // Attach socket listener
-    socketMS.on(socketEvents.PIN_STATUS, handlePinStatus);
+    socket?.on(socketEvents.PIN_STATUS, handlePinStatus);
 
     // Emit initial requests for pin statuses
     if (device?.controls) {
       device.controls.forEach((pin) => {
-        socketMS.emit(socketEvents.GET_PIN_STATUS, { id: deviceId, pin_no: pin });
+        emitEvent(socketEvents.GET_PIN_STATUS, { id: deviceId, pin_no: pin });
       });
     }
 
     // Cleanup listener on unmount
     return () => {
-      socketMS.off(socketEvents.PIN_STATUS, handlePinStatus);
+      socket?.off(socketEvents.PIN_STATUS, handlePinStatus);
     };
   }, [deviceId, device]);
 

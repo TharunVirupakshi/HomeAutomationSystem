@@ -108,6 +108,10 @@ io.on('connection', (socket) => {
     // App emits this event
     socket.on('CONNECT_TO_MASTER_SERVER', ({masterServerId}) => {
         const fromMaster = `From_MasterServer-${masterServerId}`;
+        const toMaster = `To_MasterServer-${masterServerId}`;
+
+        // io.to(toMaster).emit('PING_REQ', {});
+        
         socket.join(fromMaster);
         console.log(`App joined ${fromMaster}`);
     });
@@ -118,7 +122,9 @@ io.on('connection', (socket) => {
         event,
         payload
     }) => {
+
         const toMaster = `To_MasterServer-${masterServerId}`;
+        // io.to(toMaster).emit('PING_REQ', {});
         io.to(toMaster).emit(event, payload);
         console.log(`Message sent to master server ${masterServerId}: ${event}`);
     });

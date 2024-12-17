@@ -192,7 +192,7 @@ export default function Index() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: () => <HeaderComponent isConnected={isConnected} source={source} onMenuPress={toggleHeaderMenu}/>,
+          headerTitle: () => <HeaderComponent isConnected={isConnected} isCloudOn={isCloudConnected} isLocalOn={isLocalConnected} source={source} onMenuPress={toggleHeaderMenu}/>,
           headerShadowVisible: false,
           headerStyle: {
             backgroundColor: COLORS.background,
@@ -270,7 +270,7 @@ export default function Index() {
     </SafeAreaView>
   );
 }
-const HeaderComponent = ({isConnected, source, onMenuPress} : {isConnected: boolean, source: string, onMenuPress: ()=> void}) => {
+const HeaderComponent = ({isConnected, source, onMenuPress, isCloudOn, isLocalOn} : {isConnected: boolean, isCloudOn:boolean, isLocalOn: boolean, source: string, onMenuPress: ()=> void}) => {
   return (
     <View style={styles.customHeader}>
       <View
@@ -318,7 +318,7 @@ const HeaderComponent = ({isConnected, source, onMenuPress} : {isConnected: bool
             numberOfLines={1}
             ellipsizeMode='middle'
             >My Home</Text>
-          <Entypo name="dot-single" size={30} color={isConnected ? source === "cloud" ? COLORS.textBlue : 'lightgreen' : 'grey'} />
+          <Entypo name="dot-single" size={30} color={isConnected ? isCloudOn ? COLORS.textBlue : 'lightgreen' : 'grey'} />
         </View>
       </PressableWithOpacity>
       </View>

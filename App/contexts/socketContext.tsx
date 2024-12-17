@@ -18,7 +18,7 @@ export interface cloudSocketMessage {
 }
 
 const HOST_IP = "192.168.43.74";
-const SOCKET_URL = `http://${"192.168.43.73"}:3000`;
+const SOCKET_URL = `http://${HOST_IP}:3000`;
 const CLOUD_SOCKET_URL = `http://${HOST_IP}:5001`;
 
 const SocketContext = createContext<SocketContextType | null  >(null);
@@ -58,6 +58,8 @@ export const SocketProvider = ({ children } : SocketProviderProps) => {
           console.log('Connecting to MasterServer via Cloud Tunnel')
           setIsCloudConnected(true);
           newSocket.emit(cloudSocketEvents.CONNECT_TO_MASTER_SERVER, { masterServerId: '1'})
+        }else{
+          setIsLocalConnected(true)
         }
         setSource(source);
       });

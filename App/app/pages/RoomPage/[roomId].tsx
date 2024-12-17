@@ -151,8 +151,32 @@ export default function Room() {
   
   const connectToCloud = ()=>{
     initializeSocket('cloud');
+    setTimeout(()=>{
+      if(!isCloudConnected){
+        Alert.alert(
+          "Cloud Server Unreachable",
+          `The Cloud Server seems to be unreachable, try again later.`,
+          [{ text: "OK"}],
+          { cancelable: true } 
+        );
+      }
+    }, 5000)
     setTriggerRefresh(!triggerRefresh);
+  }
 
+  const connectToLocal = () => {
+    initializeSocket('local');
+    setTimeout(()=>{
+      if(!isLocalConnected){
+        Alert.alert(
+          "Local Master Server Unreachable",
+          `The Local Master Server seems to be unreachable, try again later.`,
+          [{ text: "OK"}],
+          { cancelable: true } 
+        );
+      }
+    }, 5000)
+    setTriggerRefresh(!triggerRefresh);
   }
   
   const [controls, setControls ] = useState<Control[]>([])
@@ -285,6 +309,16 @@ useEffect(() => {
   function handleControlPin(item: Control): void {
     const deviceId = item.device_id;
 
+    if(source === 'cloud' &&  !isCloudConnected) {
+      Alert.alert(
+        "Cloud Server Unreachable",
+        `The Cloud Server seems to be unreachable, please connect to Local Master Server if available.`,
+        [{ text: "Connect to Local Server", onPress: () => connectToLocal() }],
+        { cancelable: true } 
+      );
+      return; 
+    }
+
     if (!isLocalConnected && !isCloudConnected) {
       Alert.alert(
         "Master Server Offline",
@@ -294,6 +328,8 @@ useEffect(() => {
       );
       return;
     }
+
+   
 
     // Check if deviceId is defined
     if (

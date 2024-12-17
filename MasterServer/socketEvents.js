@@ -24,7 +24,9 @@ const socketEvents = {
     cloud: {
       // MasterServer-Cloud-App Events
       REGISTER_MASTER_SERVER: "REGISTER_MASTER_SERVER",
-      TO_APP: "TO_APP"
+      TO_APP: "TO_APP",
+      PING_REQ: "PING_REQ",
+      PING_RES: "PING_RES"
     }
    
   };

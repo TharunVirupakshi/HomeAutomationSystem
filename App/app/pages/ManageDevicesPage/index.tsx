@@ -52,7 +52,7 @@ const setDummyData = async() => {
 
 export default function ManageDevicesPage() {
 
-  const {socket, isConnected, source, emitEvent} = useSocket();
+  const {socket, isCloudConnected, isLocalConnected, source, emitEvent} = useSocket();
 
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus>({})

@@ -4,7 +4,8 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { FontAwesome5, FontAwesome6, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { Stack } from "expo-router";
 import { COLORS } from "@/constants";
-import { initializeSocket, socketEvents } from "@/API/masterServer";
+import { socketEvents } from "@/API/masterServer";
+import { useSocket } from "@/contexts/socketContext";
 
 
 interface Control {
@@ -54,7 +55,6 @@ const dummyData = {
     },
   };
 
-const socketMS = initializeSocket();
 
 interface Device{
     device_id: string,
@@ -62,6 +62,8 @@ interface Device{
 }
 
 const ManageControlsPage = () => {
+
+  const {socket, emitEvent, isCloudConnected, isLocalConnected, source, initializeSocket} = useSocket();
   
   const navigation = useNavigation();
   const route = useRoute();
@@ -76,8 +78,8 @@ const ManageControlsPage = () => {
   useEffect(()=>{
     const fetchDevices = async() => {
         try {
-          socketMS.emit(socketEvents.DISCOVER_DEVICES);
-          socketMS.on(socketEvents.DEVICE_LIST, (msg)=>{
+          emitEvent(socketEvents.DISCOVER_DEVICES, {});
+          socket?.on(socketEvents.DEVICE_LIST, (msg)=>{
             console.log("Devices received:", msg);
             setDevices(msg.devices);
           })
@@ -87,7 +89,7 @@ const ManageControlsPage = () => {
     }
     fetchDevices()
     return () => {
-        socketMS.off(socketEvents.DEVICE_LIST);
+        socket?.off(socketEvents.DEVICE_LIST);
     };
   },[])
 
@@ -103,7 +105,7 @@ const ManageControlsPage = () => {
         
         const data: Control[] = [];
 
-        socketMS.on(socketEvents.PIN_STATUS, (msg)=>{
+        socket?.on(socketEvents.PIN_STATUS, (msg)=>{
             const pins = msg.pins;
             Object.entries(pins).forEach(([pin, state]) => {
                 data.push({
@@ -117,7 +119,7 @@ const ManageControlsPage = () => {
         })
 
         devices.forEach((device)=> {
-            socketMS.emit(socketEvents.GET_PIN_STATUS, {
+            emitEvent(socketEvents.GET_PIN_STATUS, {
                 id: device.device_id,
                 pin_no: "all"
             })
@@ -136,7 +138,7 @@ const ManageControlsPage = () => {
 
     // Cleanup function to remove the listener
     return () => {
-        socketMS.off(socketEvents.PIN_STATUS);
+        socket?.off(socketEvents.PIN_STATUS);
     };
   }, [devices]);
 

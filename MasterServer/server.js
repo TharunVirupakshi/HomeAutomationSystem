@@ -28,7 +28,15 @@ cloudSocket.on('connect', () => {
   cloudSocket.emit(socketEvents.cloud.REGISTER_MASTER_SERVER, { masterServerId: '1'})
 
   // Attach event listeners
- 
+
+  cloudSocket.on(socketEvents.cloud.PING_REQ, ()=>{
+    cloudSocket.emit(socketEvents.cloud.TO_APP, {
+      masterServerId: '1',
+      event: socketEvents.cloud.PING_RES,
+      payload: {}
+    })
+  })
+
   cloudSocket.on(socketEvents.DISCOVER_DEVICES, () => {
     console.log(`[INFO] DISCOVER_DEVICES event received from CLOUD`);
     // console.log(`[ACTION] Self joining room: device-discovery`);
