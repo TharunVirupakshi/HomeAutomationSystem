@@ -17,9 +17,12 @@ import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { FontAwesome5, FontAwesome6 } from "@expo/vector-icons";
-import { initializeSocket, onConnectionStatusChange, socketEvents } from "@/API/masterServer";
+import { socketEvents } from "@/API/masterServer";
 import { Socket } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { cloudSocketEvents } from "@/API/cloudServer";
+import { canDismiss } from "expo-router/build/global-state/routing";
+import { useSocket } from "@/contexts/socketContext";
 
 
 
@@ -95,32 +98,62 @@ const dummyData = {
 
 type RoomName = keyof typeof dummyData;
 
-const socketMS = initializeSocket();
+// const socketMS = initializeSocket();
+
 
 export default function Room() {
+
+  const { socket, source, initializeSocket, emitEvent, isCloudConnected, isLocalConnected} = useSocket();
+
   const { roomId } = useLocalSearchParams<{roomId: string}>();
   const [room, setRoom] = useState<Room | null>(null)
 
   // const [socketMS, setSocketMS] = useState<Socket | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  // const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [triggerRefresh, setTriggerRefresh] = useState(false);
+
   const [isListenerAttached, setIsListenerAttached] = useState(false);
 
-   // Define the callback for connection status updates
-  const handleConnectionStatusChange = useCallback((status: boolean) => {
-    console.log('web socket connection status changed: ', status)
-    setIsConnected(status);
-  }, []);
+  // useEffect(()=>{
+  //   setIsConnected(socket ? socket.connected : false);
+  // },[socket])
 
-  useEffect(()=>{
-    // const socket_instance = initializeSocket();
-    // setSocketMS(socket_instance);
-    onConnectionStatusChange(handleConnectionStatusChange);
-    // Register the callback for connection status changes
-    return () => {
-      onConnectionStatusChange(()=>{})
-    }; 
-  }, []);
+   // Define the callback for connection status updates
+  // const handleConnectionStatusChange = useCallback((status: boolean) => {
+  //   console.log('web socket connection status changed: ', status)
+  //   setIsConnected(status);
+  // }, []);
+
+  // useEffect(()=>{
+  //   // const socket_instance = initializeSocket();
+  //   // setSocketMS(socket_instance);
+  //   onConnectionStatusChange(handleConnectionStatusChange);
+  //   // Register the callback for connection status changes
+  //   return () => {
+  //     onConnectionStatusChange(()=>{})
+  //   }; 
+  // }, []);
+
+
+  // For CLOUD
+  // const handleCloudConnectionStatusChange = useCallback((status: boolean) => {
+  //   console.log('Cloud web socket connection status changed: ', status)
+  //   setIsCloudConnected(status);
+  // }, []);
+
+  // useEffect(()=>{
+ 
+  //   onCloudConnectionStatusChange(handleCloudConnectionStatusChange);
+  //   return () => {
+  //     onCloudConnectionStatusChange(()=>{})
+  //   }; 
+  // }, []);
   
+  const connectToCloud = ()=>{
+    initializeSocket('cloud');
+    setTriggerRefresh(!triggerRefresh);
+
+  }
   
   const [controls, setControls ] = useState<Control[]>([])
   const [isRoomDataLoaded, setIsRoomDataLoaded] = useState(false);
@@ -170,19 +203,25 @@ export default function Room() {
   useFocusEffect(
     useCallback(() => {
       
-      if (!isRoomDataLoaded || !socketMS.connected) return;
+      if (!isRoomDataLoaded || !(isLocalConnected || isCloudConnected)) return;
 
       console.log('[INFO] Attaching event listeners')
       // Listen for DEVICE_INFO events
-      socketMS.on(socketEvents.DEVICE_INFO, (data) => {
-        const { device_id, status } = data;
-        console.log("Device HeartBeat: ", data);
-        setDevices((prevDevices) => ({
-          ...prevDevices,
-          [device_id]: { status },
-        }));
-      });
 
+
+      if(socket){
+        socket.on(socketEvents.DEVICE_INFO, (data) => {
+          const { device_id, status } = data;
+          console.log("Device HeartBeat: ", data);
+          setDevices((prevDevices) => ({
+            ...prevDevices,
+            [device_id]: { status },
+          }));
+        });
+      }
+      
+
+    
 
       // Attach listeners for Pin statuses
       const handlePinStatus = (msg: {
@@ -203,18 +242,19 @@ export default function Room() {
           return updatedControls;
         });
       };
-      socketMS.on(socketEvents.PIN_STATUS, handlePinStatus);
+
+      if(socket)  socket.on(socketEvents.PIN_STATUS, handlePinStatus);
       
       setIsListenerAttached(true)
      
       return () => {
-        if(socketMS.connected){
-          socketMS.off(socketEvents.DEVICE_INFO)
-          socketMS.off(socketEvents.PIN_STATUS)
+        if(socket?.connected){
+          socket.off(socketEvents.DEVICE_INFO)
+          socket.off(socketEvents.PIN_STATUS)
           setIsListenerAttached(false)
         }  
       };
-    }, [isRoomDataLoaded, socketMS])
+    }, [isRoomDataLoaded, socket, triggerRefresh])
   );
 
 
@@ -226,50 +266,62 @@ useEffect(() => {
   // console.log("[INFO] Emitting device status requests... for devices: ", devices);
   Object.keys(devices).forEach(device_id =>{
     console.log("[INFO]  Emitting device status requests for: ", device_id)
-    socketMS.emit(socketEvents.GET_DEVICE_INFO, { id:  device_id})
+    
+    emitEvent(socketEvents.GET_DEVICE_INFO, { id:  device_id})
   } )
 
   console.log("[INFO] Emitting pin status requests...");
   controls.forEach((control) => {
-    socketMS.emit(socketEvents.GET_PIN_STATUS, {
-      id: control.device_id,
-      pin_no: control.id,
-    });
-  });
-
-},[isListenerAttached, socketMS])
+      emitEvent(socketEvents.GET_PIN_STATUS, {
+        id: control.device_id,
+        pin_no: control.id,
+      });
+  })  
+    
+},[isListenerAttached, socket, triggerRefresh])
   
  
 
   function handleControlPin(item: Control): void {
     const deviceId = item.device_id;
 
-    if(!isConnected){
+    if (!isLocalConnected && !isCloudConnected) {
       Alert.alert(
-        'Master Server Offline',
-        `The Master Server seems to be offline.`,
-        [{ text: 'OK' }]
-      );
-      return; 
-    }
-
-    // Check if deviceId is defined
-    if (!deviceId || !devices.hasOwnProperty(deviceId) || devices[deviceId].status === 'OFFLINE') {
-      Alert.alert(
-        'Device Offline',
-        `The device with ID ${deviceId || 'unknown'} seems to be offline.`,
-        [{ text: 'OK' }]
+        "Master Server Offline",
+        `The Master Server seems to be offline, please connect to cloud.`,
+        [{ text: "Connect to Cloud", onPress: () => connectToCloud() }],
+        { cancelable: true } 
       );
       return;
     }
-    socketMS.emit(socketEvents.CONTROL_DEVICE, {
+
+    // Check if deviceId is defined
+    if (
+      !deviceId ||
+      !devices.hasOwnProperty(deviceId) ||
+      devices[deviceId].status === "OFFLINE"
+    ) {
+      Alert.alert(
+        "Device Offline",
+        `The device with ID ${deviceId || "unknown"} seems to be offline.`,
+        [{ text: "OK" }],
+        { cancelable: true } 
+      );
+      return;
+    }
+
+    emitEvent(socketEvents.CONTROL_DEVICE, {
       id: item.device_id,
       pin_no: item.id,
-      state: item.status === 'on' ? "LOW" : "HIGH"
-    })
+      state: item.status === "on" ? "LOW" : "HIGH",
+    });
   }
 
+
   const getDeviceStatus = (id: any) : string  => {
+
+    if(!(isLocalConnected || isCloudConnected)) return "OFFLINE"
+
     if(devices.hasOwnProperty(id))
       return devices[id].status
     else

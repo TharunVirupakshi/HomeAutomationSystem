@@ -6,6 +6,7 @@ import { COLORS, FONTS } from "@/constants";
 import { initializeSocket, socketEvents } from "@/API/masterServer";
 import WifiManager from 'react-native-wifi-reborn'
 import axios from "axios";
+import { useSocket } from "@/contexts/socketContext";
 
 
 // Local storage
@@ -47,9 +48,12 @@ const setDummyData = async() => {
 
 // setDummyData()
 
-const socketMS = initializeSocket()
+// const socketMS = initializeSocket()
 
 export default function ManageDevicesPage() {
+
+  const {socket, isConnected, source, emitEvent} = useSocket();
+
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus>({})
   const [newDeviceName, setNewDeviceName] = useState("");
@@ -235,7 +239,7 @@ export default function ManageDevicesPage() {
 
   useFocusEffect(
     useCallback(()=>{
-      socketMS.on(socketEvents.DEVICE_INFO, (msg) => {
+      socket?.on(socketEvents.DEVICE_INFO, (msg) => {
         const { device_id, status } = msg;
         console.log("Device HeartBeat: ", msg);
         setDeviceStatus(prev =>({
@@ -245,13 +249,13 @@ export default function ManageDevicesPage() {
       })
 
       devices.forEach((device) => {
-        socketMS.emit(socketEvents.GET_DEVICE_INFO, { id: device.id})
+        emitEvent(socketEvents.GET_DEVICE_INFO, { id: device.id})
       })
 
       return () => {
-        socketMS.off(socketEvents.DEVICE_INFO)
+        socket?.off(socketEvents.DEVICE_INFO)
       }
-    },[devices, socketMS])
+    },[devices, socket])
   )
 
   const [isModalOpen, setIsModalOpen] = useState(false)

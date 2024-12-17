@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useContext } from "react";
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Pressable, Text, View, StyleSheet, Animated, Image, TouchableOpacity, FlatList, Modal} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,11 +13,12 @@ import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { initializeSocket, onConnectionStatusChange } from "@/API/masterServer";
+// import { initializeSocket, onConnectionStatusChange } from "@/API/masterServer";
 import { Socket } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { isObjectMethod } from "@babel/types";
+import { SocketContextType, useSocket } from "@/contexts/socketContext";
 
 
 
@@ -123,37 +124,44 @@ const saveDummyData = async() => {
 
 
 
-const socketMS = initializeSocket()
+
 
 export default function Index() {
 
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const { socket, source, initializeSocket, isCloudConnected, isLocalConnected } = useSocket();
+  const [isConnected, setIsConnected] = useState(false);
+  // const isConnected = false
+
   const [rooms, setRooms] = useState<Room[]>([])
 
+  useEffect(()=>{
+    console.log(`[Homepage] Webscocket (${source}): ${socket?.connected ? 'CONNECTED' : 'DISCONNECTED'}`)
+    setIsConnected(isCloudConnected || isLocalConnected);
+  }, [socket, source, isCloudConnected, isLocalConnected])
+
   // Define the callback for connection status updates
-  const handleConnectionStatusChange = useCallback((status: boolean) => {
-    console.log("WebSocket connection status changed:", status);
-    setIsConnected(status);
-  }, []);
+  // const handleConnectionStatusChange = useCallback((status: boolean) => {
+  //   console.log("WebSocket connection status changed:", status);
+  //   setIsConnected(status);
+  // }, []);
 
-  useEffect(() => {
-    // Register the callback
-    const unregisterCallback = onConnectionStatusChange(handleConnectionStatusChange);
+  // useEffect(() => {
+  //   // Register the callback
+  //   const unregisterCallback = onConnectionStatusChange(handleConnectionStatusChange);
 
-    // Initialize the socket connection
-    initializeSocket();
-
-    // Cleanup: Unregister this callback on unmount
-    return () => {
-      unregisterCallback();
-    };
-  }, [handleConnectionStatusChange]);
+  //   // Cleanup: Unregister this callback on unmount
+  //   return () => {
+  //     unregisterCallback();
+  //   };
+  // }, [handleConnectionStatusChange]);
 
 
   
   const [isMenuVisible, setMenuVisible] = useState(false);
+  const [isHeaderMenuVisible, setIsHeaderMenuVisible] = useState(false);
 
   const toggleMenu = () => setMenuVisible(!isMenuVisible);
+  const toggleHeaderMenu = () => setIsHeaderMenuVisible(!isHeaderMenuVisible);
 
    // Load rooms from AsyncStorage
    const loadRooms = async () => {
@@ -184,7 +192,7 @@ export default function Index() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: () => <HeaderComponent isConnected={isConnected}/>,
+          headerTitle: () => <HeaderComponent isConnected={isConnected} source={source} onMenuPress={toggleHeaderMenu}/>,
           headerShadowVisible: false,
           headerStyle: {
             backgroundColor: COLORS.background,
@@ -209,7 +217,7 @@ export default function Index() {
           </Pressable>
         </View>
 
-        {/* Popup Menu */}
+        {/* Popup Menu for MyRooms*/}
         <PopUpMenu
           isMenuVisible={isMenuVisible}
           toggleMenu={toggleMenu}
@@ -223,6 +231,25 @@ export default function Index() {
             {
               label: "Rerrange rooms",
               onPress: () => {}
+            }
+          ]}
+        />
+        {/* Popup Menu for header */}
+        <PopUpMenu
+          isMenuVisible={isHeaderMenuVisible}
+          toggleMenu={toggleHeaderMenu}
+          menuOptions={[
+            {
+              label: `Switch to Local Server`,
+              onPress: () => {
+                initializeSocket('local')
+              }
+            },
+            {
+              label: `Switch to Cloud Server`,
+              onPress: () => {
+                initializeSocket('cloud')
+              }
             }
           ]}
         />
@@ -243,7 +270,7 @@ export default function Index() {
     </SafeAreaView>
   );
 }
-const HeaderComponent = ({isConnected} : {isConnected: boolean}) => {
+const HeaderComponent = ({isConnected, source, onMenuPress} : {isConnected: boolean, source: string, onMenuPress: ()=> void}) => {
   return (
     <View style={styles.customHeader}>
       <View
@@ -291,7 +318,7 @@ const HeaderComponent = ({isConnected} : {isConnected: boolean}) => {
             numberOfLines={1}
             ellipsizeMode='middle'
             >My Home</Text>
-          <Entypo name="dot-single" size={30} color={isConnected ? 'lightgreen' : 'grey'} />
+          <Entypo name="dot-single" size={30} color={isConnected ? source === "cloud" ? COLORS.textBlue : 'lightgreen' : 'grey'} />
         </View>
       </PressableWithOpacity>
       </View>
@@ -305,7 +332,7 @@ const HeaderComponent = ({isConnected} : {isConnected: boolean}) => {
         <PressableWithOpacity>
           <Ionicons name="notifications" size={20} color="white" />
         </PressableWithOpacity> */}
-        <PressableWithOpacity>
+        <PressableWithOpacity onPressIn={onMenuPress}>
           <Feather name="menu" size={20} color="white" style={{marginLeft: 15}}/>
         </PressableWithOpacity>
       </View>

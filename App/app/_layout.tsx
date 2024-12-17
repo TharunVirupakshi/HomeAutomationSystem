@@ -4,6 +4,7 @@ import React, {useState, useEffect, useCallback} from "react";
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from '../hooks/useFonts'; 
 import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import { SocketProvider } from "@/contexts/socketContext";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -35,26 +36,31 @@ export default function RootLayout() {
     },
   };
 
-  return <Stack
-    
-    screenOptions={{
-      headerShown: false,
-      headerStyle: {
-        backgroundColor: COLORS.background
-      }, 
-      headerTitleStyle: {
-        fontWeight: 'bold',
-        color: COLORS.text
-      },
-      headerTintColor: COLORS.primary,
-      presentation: 'transparentModal'
-    }}>
+  return (
+
+  <SocketProvider>
+    <Stack
       
-      <Stack.Screen name='(tabs)' options={{
+      screenOptions={{
+        headerShown: false,
         headerStyle: {
           backgroundColor: COLORS.background
-        }
-      }}/>
-      
-      </Stack>;
+        }, 
+        headerTitleStyle: {
+          fontWeight: 'bold',
+          color: COLORS.text
+        },
+        headerTintColor: COLORS.primary,
+        presentation: 'transparentModal'
+      }}>
+        
+        <Stack.Screen name='(tabs)' options={{
+          headerStyle: {
+            backgroundColor: COLORS.background
+          }
+        }}/>
+        
+    </Stack>
+  </SocketProvider>  
+  )
 }

@@ -4,7 +4,11 @@ import { io, Socket } from "socket.io-client";
 // Base URL for the MasterServer (replace with your actual server address)
 const BASE_URL = "https://your-master-server.com/api";
 // const SOCKET_URL = "http://Tharuns-MacBook-Air.local:3000";
-const SOCKET_URL = "http://192.168.43.74:3000";
+
+const hostIp = "192.168.43.75" 
+
+const SOCKET_URL = `http://${hostIp}:3000`;
+const CLOUD_SOCKET_URL = `http://${hostIp}:5001`;
 
 let socket: Socket | null = null;
 let connectionStatusCallbacks: Array<(status: boolean) => void> = []; // Array to manage multiple callbacks
@@ -32,23 +36,23 @@ const notifyConnectionStatus = (status: boolean) => {
 // Initialize the socket connection
 export const initializeSocket = () => {
   if (!socket) {
-    console.log("Connecting to MasterServer via WebSocket...");
-    socket = io(SOCKET_URL, { transports: ["websocket"] });
+    // console.log("Connecting to MasterServer via WebSocket...");
+    // socket = io(SOCKET_URL, { transports: ["websocket"] });
 
-    socket.on("connect", () => {
-      console.log("Connected to WebSocket server");
-      notifyConnectionStatus(true); // Notify all registered callbacks
-    });
+    // socket.on("connect", () => {
+    //   console.log("Connected to WebSocket server");
+    //   notifyConnectionStatus(true); // Notify all registered callbacks
+    // });
 
-    socket.on("disconnect", () => {
-      console.log("Disconnected from WebSocket server");
-      notifyConnectionStatus(false); // Notify all registered callbacks
-    });
+    // socket.on("disconnect", () => {
+    //   console.log("Disconnected from WebSocket server");
+    //   notifyConnectionStatus(false); // Notify all registered callbacks
+    // });
 
-    socket.on("connect_error", (err) => {
-      console.log("WebSocket connection error:", err.message);
-      notifyConnectionStatus(false); // Notify all registered callbacks
-    });
+    // socket.on("connect_error", (err) => {
+    //   console.log("WebSocket connection error:", err.message);
+    //   notifyConnectionStatus(false); // Notify all registered callbacks
+    // });
   }
   return socket;
 };

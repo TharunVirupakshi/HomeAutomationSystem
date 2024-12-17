@@ -93,6 +93,10 @@ MQTTclient.on('message', (topic, data) => {
 io.on('connection', (socket) => {
     console.log('client connected: ', socket.id);
 
+    socket.on('disconnect', () => {
+        console.log('client disconnected: ', socket.id);
+    })
+
 
     // Master server emits this event
     socket.on('REGISTER_MASTER_SERVER', ({masterServerId}) => {
@@ -129,6 +133,8 @@ io.on('connection', (socket) => {
         io.to(fromMaster).emit(event, payload);
         console.log(`Message sent from master server ${masterServerId} to app: ${event}`);
     });
+
+
 
 
 
