@@ -25,8 +25,13 @@
 
 const {Server} = require('socket.io');
 const http = require("http");
+const bodyParser = require('body-parser');
+const { v4: uuidv4 } = require('uuid');
+
 const express= require('express');
 const app = express();
+// Middleware
+app.use(bodyParser.json());
 const server = http.createServer(app)
 const io = new Server(server);
 
@@ -34,6 +39,10 @@ app.use(express.json());
 
 const servers=[];
 const esps=[];
+
+// Store pending acknowledgments
+const pendingAcks = new Map();
+
 const { connectToDatabase } = require('./db_connection.js');
 
 const mqtt = require("mqtt");
@@ -58,12 +67,14 @@ const responseEmitter = new EventEmitter();
 // Event: On connection success
 MQTTclient.on("connect", () => {
     console.log("Connected to MQTT broker!");
+    // MQTTclient.subscribe('+/ack')
 });
 
 // Event: On connection error
 MQTTclient.on("error", (err) => {
     console.error("Connection error:", err.message);
 });
+
 
 const publish = (topic, message) => {
     MQTTclient.publish(topic, message, {
@@ -82,10 +93,79 @@ MQTTclient.subscribe("device/info", {
 });
 
 MQTTclient.on('message', (topic, data) => {
-    if (topic === "device/info") {
-        console.log(data.toString());
-        esps.push(data.toString());
+    // if (topic === "device/info") {
+    //     console.log(data.toString());
+    //     esps.push(data.toString());
+    // }
+
+    if(topic.endsWith('ack')){
+        const device_id = topic.split('/')[0];
+        const payload = JSON.parse(data.toString());
+        const reqId = payload.id;
+        console.log(`[ACK] from:${device_id} with reqId: ${reqId}`);
+        if(pendingAcks.has(reqId)){
+            const resolve = pendingAcks.get(reqId);
+            resolve(payload);
+            pendingAcks.delete(reqId);
+        }
     }
+
+
+});
+
+app.get('/test', async(req, res)=>{
+    try {
+        res.status(200).json({status: 'success', message: 'Hello!'});
+    } catch (error) {
+        res.status(504).json({ status: 'error', message: error.message });
+    }
+})
+
+// REST API to Send Pairing Command
+app.post('/api/pair-device', async (req, res) => {
+  const { device_id, master_server_ip, master_server_hostname } = req.body;
+
+  if (!device_id || !master_server_ip || !master_server_hostname) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // Generate a unique ID for this request
+  const uniqueId = uuidv4();
+
+  // Prepare the message
+  const topic = `${device_id}/cloud_commands`;
+  const ackTopic = `${device_id}/ack`;
+  const message = JSON.stringify({
+    id: uniqueId,
+    command: 'PAIR',
+    payload: { master_server_ip, master_server_hostname },
+  });
+
+  console.log(`Publishing pairing request to ${topic}`);
+
+  MQTTclient.subscribe(ackTopic);
+  // Publish the message to the MQTT Broker
+  MQTTclient.publish(topic, message, { qos: 1 });
+
+  // Wait for acknowledgment with a 15-second timeout
+  const ackPromise = new Promise((resolve, reject) => {
+    pendingAcks.set(uniqueId, resolve);
+    setTimeout(() => {
+      if (pendingAcks.has(uniqueId)) {
+        pendingAcks.delete(uniqueId);
+        reject(new Error('Timeout: No acknowledgment received'));
+      }
+    }, 15000); // 20-second timeout
+  });
+
+  try {
+    const ackResponse = await ackPromise;
+    console.log(`ACK received for request ${uniqueId}:`, ackResponse);
+    res.status(200).json({ status: 'success', ack: ackResponse });
+  } catch (error) {
+    console.error(error.message);
+    res.status(504).json({ status: 'error', message: error.message });
+  }
 });
 
 
