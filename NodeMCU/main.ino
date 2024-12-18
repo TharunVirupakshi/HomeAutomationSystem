@@ -24,9 +24,15 @@ const char* wifi_password = "";     // Your Wi-Fi password
 const char* mqtt_server = "Tharuns-MacBook-Air.local"; // MQTT broker's IP or hostname
 const int mqtt_port = 8883;                  // MQTTS port
 
+const char* cloud_mqtt_server = "Tharuns-MacBook-Air.local";
+const int cloud_mqtt_port = 6884;
+
 // Wi-Fi and MQTT objects
 WiFiClientSecure espClient; // Secure Wi-Fi client for MQTTS
+WiFiClientSecure cloudEspClient; // Cloud MQTTS
 PubSubClient client(espClient);
+PubSubClient cloudClient(cloudEspClient);
+
 
 // MQTT credentials (if required)
 const char* mqtt_user = "";
@@ -97,6 +103,13 @@ void subscribeToTopics(const char* device_id) {
   Serial.printf("Subscribed to topic: %s\n", device_info_topic.c_str());
   Serial.printf("Subscribed to topic: %s\n", discovery_topic.c_str());
   Serial.printf("Subscribed to topic: %s\n", config_topic);
+}
+
+void subscribeToCloudTopics(const char* device_id){
+  String commands_topic = String(device_id) + "/cloud_commands";
+
+  cloudClient.subscribe(commands_topic.c_str());
+  Serial.printf("Subscribed to topic: %s\n", commands_topic.c_str());
 }
 
 
@@ -239,12 +252,100 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
+void handleCloudCommands(const char* msg){
+  String cloud_ack_topic = String(device_id) + "/ack";
+
+  // Publish acknowledgment back to the cloud MQTT broker
+  DynamicJsonDocument ackDoc(128); // Adjust size as needed
+
+  // Parse the JSON payload
+  DynamicJsonDocument doc(256); // Adjust size based on payload size
+  DeserializationError error = deserializeJson(doc, msg);
+
+
+  if (error) {
+    Serial.print("Failed to parse JSON: ");
+    Serial.println(error.c_str());
+    return; // Exit if JSON parsing fails
+  }
+
+  // Extract fields from the JSON payload
+  const char* id = doc["id"];
+  const char* command = doc["command"];
+
+  if(strcmp(command, "PAIR") == 0){
+    ackDoc["id"] = id; // Include the unique ID
+    ackDoc["status"] = "RECEIVED";
+    ackDoc["command"] = "PAIR";
+    ackDoc["timestamp"] = millis();
+
+    char ackPayload[128];
+    serializeJson(ackDoc, ackPayload);
+
+    if (cloudClient.publish(cloud_ack_topic.c_str(), ackPayload)) {
+      Serial.println("Acknowledgment sent to Cloud.");
+    } else {
+      Serial.println("Failed to send acknowledgment.");
+    }
+
+    Serial.println("Processing the COMMAND");
+    delay(5000);
+
+  }else{
+    Serial.println("Unknown command received.");
+    ackDoc["id"] = id;
+    ackDoc["status"] = "FAILED";
+    ackDoc["command"] = command;
+    ackDoc["error"] = "Unknown command";
+    ackDoc["timestamp"] = millis();
+    char ackPayload[128];
+    serializeJson(ackDoc, ackPayload);
+
+    if (cloudClient.publish(cloud_ack_topic.c_str(), ackPayload)) {
+      Serial.println("Error Acknowledgment sent to Cloud.");
+    } else {
+      Serial.println("Failed to send error acknowledgment.");
+    }
+  }
+
+  const char* master_server_ip = doc["payload"]["master_server_ip"];
+  const char* master_server_hostname = doc["payload"]["master_server_hostname"];
+  
+}
+
+// Callback for Cloud MQTT
+void cloud_callback(char* topic, byte* payload, unsigned int length){
+  String topic_str = String(topic);
+
+  Serial.print("Message arrived on Cloud topic: ");
+  Serial.println(topic);
+
+  char message[length + 1];
+  memcpy(message, payload, length);
+  message[length] = '\0'; // Null-terminate the payload
+
+  Serial.print("Message: ");
+  Serial.println(message);
+
+  if(topic_str.endsWith("cloud_commands")){
+    handleCloudCommands(message);
+  }
+}
+
+unsigned long lastLocalReconnectAttempt = 0; // Track last reconnect attempt
+const unsigned long localReconnectInterval = 5000; // Retry every 5 seconds
+
 // Reconnect to MQTT broker
 void reconnect() {
-  int retries = 0;
-  while (!client.connected() && retries <= 15) {
-    Serial.println("Attempting MQTTS connection...");
+  if(WiFi.status() != WL_CONNECTED) return; // EXIT
+   
+  if(client.connected()) return;
 
+  unsigned long currentTime = millis();
+  if (currentTime - lastLocalReconnectAttempt >= localReconnectInterval) {
+    lastLocalReconnectAttempt = currentTime;
+
+    Serial.println("Attempting MQTTS connection...");
     if (client.connect(device_id, mqtt_user, mqtt_password)) {
       Serial.println("Connected to MQTTS broker!");
 
@@ -259,13 +360,38 @@ void reconnect() {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
       Serial.println(" Trying again in 5 seconds...");
-      delay(5000);
     }
+  }
+    
+}
 
-    if(WiFi.status() != WL_CONNECTED) return; // EXIT
-    retries++;
+unsigned long lastCloudReconnectAttempt = 0; // Track last reconnect attempt
+const unsigned long cloudReconnectInterval = 5000; // Retry every 5 seconds
+
+void cloudReconnect() {
+  if(WiFi.status() != WL_CONNECTED) return; // EXIT
+
+  if (cloudClient.connected()) {
+    return; // Already connected
+  }
+
+  unsigned long currentTime = millis();
+  if (currentTime - lastCloudReconnectAttempt >= cloudReconnectInterval) {
+    lastCloudReconnectAttempt = currentTime;
+
+    Serial.println("Attempting to reconnect to Cloud MQTT broker...");
+    if (cloudClient.connect(device_id, mqtt_user, mqtt_password)) {
+      Serial.println("Connected to Cloud MQTT broker!");
+
+      subscribeToCloudTopics(device_id);
+    } else {
+      Serial.printf("Failed to connect to Cloud MQTT broker. State: %d\n", cloudClient.state());
+    }
   }
 }
+
+
+
 
 // Configure MQTTS
 void setupMQTT() {
@@ -277,6 +403,13 @@ void setupMQTT() {
   client.setCallback(callback);
   generateTopics(device_id); 
   subscribeToTopics(device_id);
+}
+
+void setupCloudMQTT(){
+  cloudEspClient.setCACert(ca_cert);
+  cloudClient.setServer(cloud_mqtt_server, cloud_mqtt_port);
+  cloudClient.setCallback(cloud_callback);
+  subscribeToCloudTopics(device_id);
 }
 
 void connectToWiFi(const char* ssid, const char* password){
@@ -369,6 +502,7 @@ void connectionSetup(){
 
  
     if(WiFi.status() == WL_CONNECTED){
+      setupCloudMQTT();
       setupMQTT();
     }else{
 
@@ -444,13 +578,18 @@ const unsigned long softAPInterval = 1*60000; // 2 minute
 void loop() {
 
   if (WiFi.status() == WL_CONNECTED) {
-    if(reconnectAttempted) setupMQTT();
+    if(reconnectAttempted){
+      setupCloudMQTT();
+      setupMQTT();
+    } 
     reconnectAttempted = false;
 
-    if (!client.connected()) {
-      reconnect();  // Reconnect to MQTT broker if disconnected
-    }
-    client.loop();  // Regularly handle MQTT tasks  
+  
+    reconnect();  // Reconnect to MQTT broker if disconnected. Will exit if already connected.
+    client.loop();  // Regularly handle MQTT tasks
+
+    cloudReconnect(); // Will exit if already connected. (Non-blocking function)
+    cloudClient.loop();  
 
     unsigned long currentTime = millis();
     if (currentTime - lastPollTime >= pollInterval) {
