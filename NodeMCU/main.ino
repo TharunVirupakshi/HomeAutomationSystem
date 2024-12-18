@@ -256,10 +256,10 @@ void handleCloudCommands(const char* msg){
   String cloud_ack_topic = String(device_id) + "/ack";
 
   // Publish acknowledgment back to the cloud MQTT broker
-  DynamicJsonDocument ackDoc(128); // Adjust size as needed
+  DynamicJsonDocument ackDoc(512); // Adjust size as needed
 
   // Parse the JSON payload
-  DynamicJsonDocument doc(256); // Adjust size based on payload size
+  DynamicJsonDocument doc(512); // Adjust size based on payload size
   DeserializationError error = deserializeJson(doc, msg);
 
 
@@ -279,7 +279,7 @@ void handleCloudCommands(const char* msg){
     ackDoc["command"] = "PAIR";
     ackDoc["timestamp"] = millis();
 
-    char ackPayload[128];
+    char ackPayload[256];
     serializeJson(ackDoc, ackPayload);
 
     if (cloudClient.publish(cloud_ack_topic.c_str(), ackPayload)) {
@@ -289,16 +289,38 @@ void handleCloudCommands(const char* msg){
     }
 
     Serial.println("Processing the COMMAND");
-    delay(5000);
+    // delay(5000);
 
-  }else{
+    // const char* master_server_ip = doc["payload"]["master_server_ip"];
+    // const char* master_server_hostname = doc["payload"]["master_server_hostname"];
+
+  }else if(strcmp(command, "RESTART") == 0){
+    ackDoc["id"] = id; // Include the unique ID
+    ackDoc["status"] = "RECEIVED";
+    ackDoc["command"] = command;
+    ackDoc["timestamp"] = millis();
+
+    char ackPayload[256];
+    serializeJson(ackDoc, ackPayload);
+
+    if (cloudClient.publish(cloud_ack_topic.c_str(), ackPayload)) {
+      Serial.println("Acknowledgment sent to Cloud.");
+    } else {
+      Serial.println("Failed to send acknowledgment.");
+    }
+
+    Serial.println("RESTARTING in 5s...");
+    delay(5000);
+    ESP.restart();
+  }
+  else{
     Serial.println("Unknown command received.");
     ackDoc["id"] = id;
     ackDoc["status"] = "FAILED";
     ackDoc["command"] = command;
     ackDoc["error"] = "Unknown command";
     ackDoc["timestamp"] = millis();
-    char ackPayload[128];
+    char ackPayload[256];
     serializeJson(ackDoc, ackPayload);
 
     if (cloudClient.publish(cloud_ack_topic.c_str(), ackPayload)) {
@@ -308,8 +330,7 @@ void handleCloudCommands(const char* msg){
     }
   }
 
-  const char* master_server_ip = doc["payload"]["master_server_ip"];
-  const char* master_server_hostname = doc["payload"]["master_server_hostname"];
+  
   
 }
 

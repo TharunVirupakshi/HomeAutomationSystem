@@ -169,6 +169,55 @@ app.post('/api/pair-device', async (req, res) => {
 });
 
 
+app.post('/api/restart-device', async (req, res) => {
+  const { device_id } = req.body;
+
+  if (!device_id) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // Generate a unique ID for this request
+  const uniqueId = uuidv4();
+
+  // Prepare the message
+  const topic = `${device_id}/cloud_commands`;
+  const ackTopic = `${device_id}/ack`;
+  const message = JSON.stringify({
+    id: uniqueId,
+    command: 'RESTART',
+    payload: {}, // Empty
+  });
+
+  console.log(`Publishing RESTART request to ${topic}`);
+
+  MQTTclient.subscribe(ackTopic);
+  // Publish the message to the MQTT Broker
+  MQTTclient.publish(topic, message, { qos: 1 });
+
+  // Wait for acknowledgment with a 15-second timeout
+  const ackPromise = new Promise((resolve, reject) => {
+    pendingAcks.set(uniqueId, resolve);
+    setTimeout(() => {
+      if (pendingAcks.has(uniqueId)) {
+        pendingAcks.delete(uniqueId);
+        reject(new Error('Timeout: No acknowledgment received'));
+      }
+    }, 15000); // 20-second timeout
+  });
+
+  try {
+    const ackResponse = await ackPromise;
+    console.log(`ACK received for request ${uniqueId}:`, ackResponse);
+    res.status(200).json({ status: 'success', ack: ackResponse });
+  } catch (error) {
+    console.error(error.message);
+    res.status(504).json({ status: 'error', message: error.message });
+  }
+});
+
+
+
+
 // WebSocket setup
 io.on('connection', (socket) => {
     console.log('client connected: ', socket.id);
