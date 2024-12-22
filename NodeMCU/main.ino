@@ -291,8 +291,27 @@ void handleCloudCommands(const char* msg){
     Serial.println("Processing the COMMAND");
     // delay(5000);
 
-    // const char* master_server_ip = doc["payload"]["master_server_ip"];
-    // const char* master_server_hostname = doc["payload"]["master_server_hostname"];
+    String master_server_ip = doc["payload"]["master_server_ip"];
+    String master_server_hostname = doc["payload"]["master_server_hostname"];
+
+    if (!preferences.begin("mqtt", false)) {
+      Serial.println("Failed to open preferences");
+      server.send(500, "text/plain", "Server error: failed to open preferences.");
+      return;
+    }
+
+    preferences.putString("mqtt_hostname", master_server_hostname);
+    preferences.putString("mqtt_ip", master_server_ip);
+    preferences.end();
+
+    
+    Serial.printf("Saved MQTT Hostname: %s\n", master_server_hostname.c_str());
+    Serial.printf("Saved MQTT IP: %s\n", master_server_ip.c_str());
+    Serial.println("Restarting in 5s...");
+    delay(5000);
+    ESP.restart();
+
+
 
   }else if(strcmp(command, "RESTART") == 0){
     ackDoc["id"] = id; // Include the unique ID
@@ -366,6 +385,7 @@ void reconnect() {
   if (currentTime - lastLocalReconnectAttempt >= localReconnectInterval) {
     lastLocalReconnectAttempt = currentTime;
 
+
     Serial.println("Attempting MQTTS connection...");
     if (client.connect(device_id, mqtt_user, mqtt_password)) {
       Serial.println("Connected to MQTTS broker!");
@@ -416,11 +436,46 @@ void cloudReconnect() {
 
 // Configure MQTTS
 void setupMQTT() {
+
+  if (!preferences.begin("mqtt", false)) {
+    Serial.println("Failed to open mqtt preferences");
+    return;
+  }
+
+  String mqtt_hostname = preferences.getString("mqtt_hostname");
+  preferences.end();
+
+  mqtt_hostname.trim();
+  if(mqtt_hostname.length() == 0){
+    Serial.println("MQTT Hostname is empty.");
+    return;
+  }
+    
+  
+  Serial.printf("Connecting to MQTT Local on Hostname: %s\n", mqtt_hostname.c_str());
+
+  // Resolve hostname to IP
+  IPAddress mqtt_ip;
+  
+  if (WiFi.hostByName(mqtt_hostname.c_str(), mqtt_ip)) {
+    Serial.printf("Resolved MQTT Hostname to IP: %s\n", mqtt_ip.toString().c_str());
+  } else {
+    Serial.println("Failed to resolve MQTT Hostname. Aborting MQTT setup.");
+    return;
+  }
+  
+
    // Generate MQTT topics
   
   espClient.setCACert(ca_cert); // Load CA certificate
   // espClient.setInsecure();
-  client.setServer(mqtt_server, mqtt_port);
+
+  // Copy the hostname into a static character array
+  static char mqtt_host[256]; // Adjust size as needed
+  strncpy(mqtt_host, mqtt_hostname.c_str(), sizeof(mqtt_host));
+  mqtt_host[sizeof(mqtt_host) - 1] = '\0'; // Ensure null termination
+
+  client.setServer(mqtt_host, mqtt_port);
   client.setCallback(callback);
   generateTopics(device_id); 
   subscribeToTopics(device_id);
